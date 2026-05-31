@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #f6f8fc;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f9fafb;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+
+  --border-subtle: rgba(229, 231, 235, 0.8);
+  --border-default: #e5e7eb;
+  --border-focus: #111827;
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --text-accent: #111827;
+
+  --accent-cyan: #06b6d4;
+  --accent-blue: #2563eb;
+  --accent-emerald: #059669;
+  --accent-orange: #ea580c;
+
+  --font-sans: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Light Card Design */
+.card-light {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-light:hover {
+  box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.08);
+}
+
+/* Segment Tabs */
+.segment-tab-active {
+  background: #111827;
+  color: #ffffff;
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+}
+
+.segment-tab-inactive {
+  color: #4b5563;
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+}
+
+.segment-tab-inactive:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Rounded Input Group */
+.input-group-container {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  transition: all 0.2s ease;
+}
+
+.input-group-container:focus-within {
+  border-color: #111827;
+  box-shadow: 0 0 0 1px #111827;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(17, 24, 39, 0.4);
+}
