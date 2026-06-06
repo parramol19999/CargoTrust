@@ -7,11 +7,14 @@ import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { Award, BadgeCheck, FileText, CheckSquare, Loader2, RefreshCw, PenTool } from 'lucide-react';
 import { useWalletClient } from 'wagmi';
 
+import { useGasSponsorship } from '@/lib/gasSponsor';
+
 export default function VerifierDashboard() {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const { isSponsored, limitReached } = useGasSponsorship();
 
   // Batches list state
   const [batches, setBatches] = useState<any[]>([]);
@@ -284,6 +287,12 @@ export default function VerifierDashboard() {
                   <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">W3C Credential Type:</span>
                   <span className="text-gray-900 font-bold">{credType}</span>
                 </div>
+                {isSponsored && (
+                  <div>
+                    <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Gas Status:</span>
+                    <span className="text-cyan-600 font-bold">Gas Sponsored ✓</span>
+                  </div>
+                )}
                 <div>
                   <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">IPFS Document URI:</span>
                   <span className="text-gray-900 select-all font-bold">{vcIpfsHash}</span>
@@ -369,26 +378,36 @@ export default function VerifierDashboard() {
                 />
               </div>
 
+              {limitReached && (
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-[11px] text-amber-700 font-medium mb-3">
+                  ⚠️ Gas sponsorship limits reached. Transactions will require your wallet to hold native USDC gas.
+                </div>
+              )}
               <div className="pt-2">
                 {!isVerifier ? (
-                  <div className="p-3 bg-yellow-50 border border-yellow-100 rounded-2xl text-center text-xs text-yellow-700">
+                  <div className="p-3 bg-yellow-50 border border-yellow-100 rounded-2xl text-center text-xs text-yellow-700 font-semibold">
                     ⚠️ Your connected wallet is not authorized as a Verifier on-chain. Admin approval required.
                   </div>
                 ) : (
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-xl text-xs transition-all duration-300 flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-xl text-xs transition-all duration-300 flex flex-col items-center justify-center gap-0.5"
                   >
                     {isSubmitting ? (
-                      <>
+                      <span className="flex items-center gap-2 font-mono">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         {actionStep === 'signing' ? 'Signing W3C Payload...' : 'Anchoring verification on-chain...'}
-                      </>
+                      </span>
                     ) : (
                       <>
-                        <PenTool className="w-4 h-4 text-white" />
-                        Sign & Anchor Quality Credentials
+                        <span className="flex items-center gap-2">
+                          <PenTool className="w-4 h-4 text-white" />
+                          Sign & Anchor Quality Credentials
+                        </span>
+                        <span className="text-[9px] text-cyan-300 font-mono tracking-normal normal-case font-medium">
+                          {isSponsored ? 'Gas Fee: $0.00 (Sponsored)' : 'Gas Fee: Paid by User'}
+                        </span>
                       </>
                     )}
                   </button>

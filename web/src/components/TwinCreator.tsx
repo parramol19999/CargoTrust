@@ -7,10 +7,13 @@ import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { Leaf, MapPin, Calendar, Compass, FileText, Loader2, ArrowRight, ArrowLeftRight } from 'lucide-react';
 import { formatUnits } from 'viem';
 
+import { useGasSponsorship } from '@/lib/gasSponsor';
+
 export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => void }) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const { isSponsored, limitReached } = useGasSponsorship();
 
   // Segment State (Inspire by Flight/Hotel tabs)
   const [activeSegment, setActiveSegment] = useState<'registry' | 'standards' | 'logistics'>('registry');
@@ -166,6 +169,15 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <span>Mint Fee Paid:</span>
               <span className="text-gray-950 font-bold">0.10 USDC</span>
             </div>
+            {isSponsored && (
+              <div className="flex justify-between mb-1.5 font-mono text-cyan-600 font-bold">
+                <span>Gas Status:</span>
+                <span className="px-2 py-0.5 bg-cyan-50 border border-cyan-150 rounded text-[10px] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-ping" />
+                  Gas Sponsored
+                </span>
+              </div>
+            )}
             <div className="flex justify-between mt-3 pt-3 border-t border-gray-200">
               <span>Tx Hash:</span>
               <a
@@ -319,8 +331,14 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           </div>
 
           {errorMsg && (
-            <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold">
+            <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold font-mono">
               ⚠️ {errorMsg}
+            </div>
+          )}
+
+          {limitReached && (
+            <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-medium font-sans">
+              ⚠️ Gas sponsorship limits reached. The transaction will require native USDC gas tokens in your wallet.
             </div>
           )}
 
@@ -334,24 +352,29 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <button
                 type="submit"
                 disabled={loadingStep !== 'idle'}
-                className="px-8 py-3.5 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-2xl text-xs tracking-wider uppercase transition-all duration-300 flex items-center gap-2.5 shadow-lg shadow-gray-950/10 hover:shadow-gray-950/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-8 py-3.5 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-2xl text-xs tracking-wider uppercase transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-gray-950/10 hover:shadow-gray-950/20 disabled:opacity-60 disabled:cursor-not-allowed min-w-[240px]"
               >
                 {loadingStep === 'approving' && (
-                  <>
+                  <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Approving USDC...
-                  </>
+                  </span>
                 )}
                 {loadingStep === 'minting' && (
-                  <>
+                  <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Minting twin...
-                  </>
+                  </span>
                 )}
                 {loadingStep === 'idle' && (
                   <>
-                    Mint Product Twin (0.10 USDC Fee)
-                    <ArrowRight className="w-4 h-4 text-white" />
+                    <span className="flex items-center gap-2.5">
+                      Mint Product Twin (0.10 USDC Fee)
+                      <ArrowRight className="w-4 h-4 text-white" />
+                    </span>
+                    <span className="text-[10px] text-cyan-300 font-mono tracking-normal normal-case font-medium mt-0.5">
+                      {isSponsored ? 'Gas Fee: $0.00 (Sponsored)' : 'Gas Fee: Paid by User'}
+                    </span>
                   </>
                 )}
               </button>
