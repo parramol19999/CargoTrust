@@ -6,11 +6,13 @@ The platform guarantees crop provenance, integrates quality inspections via cryp
 
 ---
 
-## 🚀 Deployed Contract Address
-*   **Contract Name**: `CargoRegistry`
-*   **Network**: Arc Testnet (Chain ID: `5042002`)
-*   **Deployed Address**: [`0xAb67E0c298250d4714c3a06Ea951aAF11c17014b`](https://testnet.arcscan.app/address/0xAb67E0c298250d4714c3a06Ea951aAF11c17014b)
-*   **Explorer Audit Link**: [ArcScan - CargoRegistry Address](https://testnet.arcscan.app/address/0xAb67E0c298250d4714c3a06Ea951aAF11c17014b)
+## 🚀 Deployed Contract Addresses
+*   **CargoRegistry (ERC-721)**: [`0x2b27B16F0AAf518FF91690Df2B4FA39C5f5BCe99`](https://testnet.arcscan.app/address/0x2b27B16F0AAf518FF91690Df2B4FA39C5f5BCe99)
+*   **CargoEscrow (ERC-8183 Smart Escrow)**: [`0x935603281481F1c9acf1454964FF5DA7EBfc8Ff9`](https://testnet.arcscan.app/address/0x935603281481F1c9acf1454964FF5DA7EBfc8Ff9)
+*   **AgentRegistry (ERC-8004 Compliance Identity)**: [`0x33af1Df6e803E6ceAAF06615e85eA5732C44522C`](https://testnet.arcscan.app/address/0x33af1Df6e803E6ceAAF06615e85eA5732C44522C)
+*   **VerifierRegistry (Stake-Backed Registry)**: [`0xc2c23E68C55C2d598bdA0B6a8e7C570A79fe3A42`](https://testnet.arcscan.app/address/0xc2c23E68C55C2d598bdA0B6a8e7C570A79fe3A42)
+*   **CropLendingPool (NFT Collateral Lending)**: [`0xDE647D20c6A05A4a5f9D31f35496A08E443e9869`](https://testnet.arcscan.app/address/0xDE647D20c6A05A4a5f9D31f35496A08E443e9869)
+*   **Network**: Arc Testnet (Chain ID: `5042002`, native gas token is USDC)
 
 ---
 
@@ -19,26 +21,30 @@ The platform guarantees crop provenance, integrates quality inspections via cryp
 ```mermaid
 graph TD
     subgraph "Producer Layer"
-        A[Crop Farm / Producer] -->|Mint Twin + 0.10 USDC Fee| B[CargoRegistry ERC-721 Contract]
+        A[Crop Farm / Producer] -->|Mint Twin + 0.10 USDC Fee| B[CargoRegistry ERC-721]
     end
-    subgraph "Accredited QA Layer"
-        C[Independent Laboratory] -->|Wallet Signature: W3C VC| D[CargoRegistry addVerification]
+    subgraph "Staking & QA Layer"
+        V[Verifier] -->|Stake 500 USDC| VR[VerifierRegistry]
+        V -->|Sign Quality Attestation| B
     end
-    subgraph "B2B Commerce Layer"
-        E[Distributor / Buyer] -->|Purchase: USDC Transfer| B
-        B -->|Atomic Transfer| E
-        B -->|Disburse Funds| A
+    subgraph "DeFi & Escrow Layer"
+        LP[CropLendingPool] -->|Lock Crop NFT | B
+        LP -->|Borrow 50% LTV in USDC| A
+        Buyer[B2B Buyer] -->|Purchase| B
+        B -->|Settle Loan & Route Surplus| Escrow[CargoEscrow ERC-8183]
     end
-    subgraph "Public Layer"
-        F[End Consumer QR Portal] -->|Zero-Login Read RPC| B
+    subgraph "ERP Gateway Layer"
+        ERP[ERP System SAP/NetSuite] -->|REST API & Webhooks| GW[NestJS Gateway]
+        GW -->|Write Viem Transactions| B
     end
 ```
 
 ### 1. Technology Infrastructure
-*   **Smart Contracts**: Solidity `v0.8.20` self-contained, highly gas-optimized ERC-721 with customized payment interfaces.
+*   **Smart Contracts**: Solidity `v0.8.20` compilation utilizing Hardhat and OpenZeppelin libraries.
 *   **Frontend**: Next.js App Router with TypeScript.
-*   **Web3 Integrations**: RainbowKit `v2.2.3` for browser wallet interfaces, Wagmi `v2.5.11`, and Viem `v2.8.12`.
-*   **Styling & FX**: Tailwind CSS with custom glassmorphism components and glowing neon accent themes.
+*   **ERP Gateway**: NestJS framework with JWT authentication and cryptographically signed (HMAC-SHA256) Webhook event watcher.
+*   **Web3 Integrations**: RainbowKit, Wagmi, and Viem.
+*   **Telemetry**: Circle CLI and Circle Agent Stack integrations for IoT wallets.
 
 ### 2. Dual Decimal System Implementation
 To bypass the transaction failure bugs common in gas precompiled stablecoin chains, CargoTrust implements a precise mathematical dual-decimal parser:
@@ -49,35 +55,30 @@ To bypass the transaction failure bugs common in gas precompiled stablecoin chai
 
 ## 💎 Core Platform Features
 
-### 🍏 Feature A: Product Digital Twin Creator
-*   **Workflow**: Allows crop producers to declare metadata (Farm Origin location, Harvest Dates, GPS Coordinates, and IPFS certification links) to mint an ERC-721 digital twin representing their batch.
-*   **Commerce Mechanism**: Charges a flat **0.10 USDC** fee per minting operation which is transferred directly to the platform's treasury. It automatically handles checks and approvals for the USDC fee contract.
+### 🍏 Feature A: Product Digital Twin Creator & Splitting
+Allows crop producers to mint an ERC-721 digital twin representing their batch with origin location, harvest dates, and weights. Large batches can be divided into smaller child batches that retain full provenance links to their parent token.
 
-### 🛒 Feature B: Payment-Linked Ownership Transfer Contract
-*   **Workflow**: Owners list their minted crop batches with an exact USDC purchase price.
-*   **Atomic Swap Mechanism**: Buyers call `purchaseCargo(tokenId)`. The smart contract conducts an atomic, multi-stage transaction:
-    1.  Verifies the buyer's USDC allowance and balance.
-    2.  Transfers the purchase price in USDC directly from the buyer to the seller.
-    3.  Transfers the batch NFT ownership from the seller to the buyer.
-    4.  Resets listing status to prevent double-spending or duplicate goods smuggling.
+### 🛒 Feature B: Payment-Linked Ownership Transfer & Smart Escrow (ERC-8183)
+Buyers can purchase active listings directly. The platform routes funds through `CargoEscrow.sol` (ERC-8183), locking payments in escrow until verifiers certify the quality of the crop, or releasing refunds in the event of transit delay or cargo spoilage.
 
-### 🧪 Feature C: Authorized Verifier Credentials Dashboard
-*   **Workflow**: Accredited laboratory technicians audit active supply chain twins on-chain.
-*   **Attestation Engine**: Verifiers select a cargo batch and input laboratory results (e.g. chemical pesticide ratings, purity level). Clicking *Sign Quality Attestation* prompts their Web3 wallet to securely sign a W3C-compliant JSON-LD Verifiable Credential payload. The resulting cryptographic signature and proof are anchored permanently on-chain.
+### 🧪 Feature C: Stake-Backed Verifier Registry
+Quality inspectors are required to stake a minimum of **500 USDC** to gain credential publishing authorizations. Staked assets are subject to slashing penalties if fraudulent attestations or damaged crop twins are validated.
 
-### 🔍 Feature D: End-Consumer Scan-to-Verify Portal
-*   **Workflow**: A public, zero-login search and QR code route (e.g. `/verify?tokenId=1`).
-*   **Trust Verification**: Dynamically queries the Arc Testnet RPC node to construct an interactive stepper journey. The portal shows the crop's absolute provenance:
-    *   **Phase 1**: Farm harvesting anchor with GPS coordinates.
-    *   **Phase 2**: Lab certification logs displaying verifier signatures and W3C VC proofs.
-    *   **Phase 3**: B2B transfer audit logs showing actual USDC stablecoin transaction receipts.
+### 🌾 Feature D: Collateralized Crop Lending Pool
+Producers can lock their listed crop batch NFTs inside `CropLendingPool.sol` to borrow up to **50% LTV** of the listing price in USDC for immediate liquidity, with automatic registry-level settlement upon crop sales.
+
+### 🔒 Feature E: Opt-In Metadata Privacy & ECDH Sharing
+Enterprise users can encrypt sensitive crop metadata (origin, coordinates, description, price) locally using AES-256. Cryptographic keys are exchanged securely between farmers and approved buyers using Elliptic Curve Diffie-Hellman (ECDH) key sharing.
+
+### 🔌 Feature F: Enterprise ERP API Gateway & Webhooks
+Exposes developer API keys, HTTPS webhooks, and REST endpoints. Enables third-party business systems (like SAP or NetSuite) to synchronize inventory and programmatically trigger on-chain mints, listings, and purchases.
 
 ---
 
 ## 💻 Setup & Local Development
 
 ### 1. Smart Contract Compilation & Deployment
-The contract workspace compiles using standard `solc` packages and deploys via dynamic scripts:
+The contract workspace compiles using standard Hardhat packages:
 ```bash
 # Go to contracts folder
 cd contracts
@@ -85,8 +86,11 @@ cd contracts
 # Install dependencies
 npm install
 
-# Deploy smart contract to Arc Testnet
-npm run deploy
+# Compile smart contracts
+npx hardhat compile
+
+# Deploy smart contracts to Arc Testnet
+node deploy.mjs
 ```
 
 ### 2. Frontend Development & Run
@@ -103,6 +107,22 @@ npm run dev
 
 # Build the optimized production bundle
 npm run build
+```
+
+### 3. NestJS ERP Gateway Run
+Launch the local ERP API server to sync inventory and trigger transactions:
+```bash
+# Go to gateway folder
+cd ../gateway
+
+# Install dependencies
+npm install
+
+# Build the NestJS project
+node_modules/typescript/bin/tsc -p tsconfig.build.json
+
+# Start the gateway
+npm run start
 ```
 
 ---
