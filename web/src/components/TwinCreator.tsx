@@ -28,8 +28,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
   const [ipfsDoc, setIpfsDoc] = useState('ipfs://QmZ4831j1n38fsVakWc92uNs8F4qW924511n9K1mUfP2');
   const [description, setDescription] = useState('Premium Organic Arabica Beans, Micro-lot harvest #408');
 
+  // Privacy States
+  const [isEncrypted, setIsEncrypted] = useState(false);
+  const [targetPrice, setTargetPrice] = useState('250.00');
+
   // Loading & Transaction States
-  const [loadingStep, setLoadingStep] = useState<'idle' | 'approving' | 'minting' | 'success'>('idle');
+  const [loadingStep, setLoadingStep] = useState<'idle' | 'encrypting' | 'approving' | 'minting' | 'success'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -95,20 +99,93 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
         await refetchAllowance();
       }
 
+      let finalOrigin = origin;
+      let finalLatLong = latLong;
+      let finalIpfsDoc = `${ipfsDoc}?desc=${encodeURIComponent(description)}`;
+      let encryptedPriceStr = '';
+
+      let aesKeyHex = '';
+      let ownerPubKey = '';
+      let ownerPrivKey = '';
+
+      if (isEncrypted) {
+        setLoadingStep('encrypting');
+        const encRes = await fetch('/api/privacy/encrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            origin,
+            latLong,
+            description,
+            price: targetPrice,
+            address,
+          }),
+        });
+        const encData = await encRes.json();
+        if (!encData.success) {
+          throw new Error(encData.error || 'Failed to encrypt metadata');
+        }
+
+        finalOrigin = encData.encrypted.origin;
+        finalLatLong = encData.encrypted.latLong;
+        finalIpfsDoc = `${ipfsDoc}?desc=${encodeURIComponent(encData.encrypted.description)}`;
+        encryptedPriceStr = encData.encrypted.price;
+
+        aesKeyHex = encData.aesKey;
+        ownerPubKey = encData.ownerPublicKey;
+        ownerPrivKey = encData.ownerPrivateKey;
+      }
+
       setLoadingStep('minting');
       const timestamp = Math.floor(new Date(harvestDate).getTime() / 1000);
       
-      const mintTx = await writeContractAsync({
-        address: CARGO_REGISTRY_ADDRESS,
-        abi: CARGO_REGISTRY_ABI,
-        functionName: 'mintCargo',
-        args: [origin, BigInt(timestamp), latLong, `${ipfsDoc}?desc=${encodeURIComponent(description)}`],
-      });
+      let mintTx;
+      if (isEncrypted) {
+        mintTx = await writeContractAsync({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'mintCargo',
+          args: [finalOrigin, BigInt(timestamp), finalLatLong, finalIpfsDoc, true, encryptedPriceStr],
+        });
+      } else {
+        mintTx = await writeContractAsync({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'mintCargo',
+          args: [finalOrigin, BigInt(timestamp), finalLatLong, finalIpfsDoc],
+        });
+      }
 
       setTxHash(mintTx);
       
       if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash: mintTx });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: mintTx });
+        
+        if (isEncrypted && aesKeyHex) {
+          // Parse tokenId from logs
+          let tokenId = 1;
+          for (const log of receipt.logs) {
+            // Transfer event topic: 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
+            if (log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef') {
+              tokenId = parseInt(log.topics[3] || '0', 16);
+            }
+          }
+
+          // Save key off-chain
+          await fetch('/api/privacy/keys', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokenId,
+              aesKey: aesKeyHex,
+              ownerPublicKey: ownerPubKey,
+              ownerPrivateKey: ownerPrivKey,
+            }),
+          });
+
+          // Save locally for owner
+          localStorage.setItem(`crop_key_${tokenId}`, aesKeyHex);
+        }
       }
 
       setLoadingStep('success');
@@ -313,6 +390,46 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
             />
           </div>
 
+          {/* Privacy Opt-In Configuration Panel */}
+          <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
+                  Opt-In Metadata Privacy
+                </span>
+                <span className="block text-[10px] text-gray-400 mt-0.5">
+                  Encrypt origin, coordinates, and price values client-side prior to minting on Arc
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isEncrypted}
+                  onChange={(e) => setIsEncrypted(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gray-900"></div>
+              </label>
+            </div>
+
+            {isEncrypted && (
+              <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    Private Target Price (USDC / EURC Value)
+                  </label>
+                  <input
+                    type="text"
+                    value={targetPrice}
+                    onChange={(e) => setTargetPrice(e.target.value)}
+                    placeholder="E.g., 250.00"
+                    className="w-full p-2.5 bg-white border border-gray-150 rounded-xl text-xs font-mono font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Account USDC Status bar */}
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs text-gray-500 font-mono">
             <span>
@@ -354,6 +471,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
                 disabled={loadingStep !== 'idle'}
                 className="px-8 py-3.5 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-2xl text-xs tracking-wider uppercase transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow-lg shadow-gray-950/10 hover:shadow-gray-950/20 disabled:opacity-60 disabled:cursor-not-allowed min-w-[240px]"
               >
+                {loadingStep === 'encrypting' && (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Encrypting payload...
+                  </span>
+                )}
                 {loadingStep === 'approving' && (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
