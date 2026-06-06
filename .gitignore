@@ -11,13 +11,14 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# Next.js build outputs
+# Next.js and NestJS build outputs
 web/.next/
 web/out/
 web/build/
 web/.vercel/
 web/*.tsbuildinfo
 web/next-env.d.ts
+gateway/dist/
 
 # Hardhat compilation and test outputs
 contracts/artifacts/

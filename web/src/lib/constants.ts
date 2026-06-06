@@ -10,8 +10,8 @@ export const USDC_DECIMALS = 6;
 export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a' as const;
 export const EURC_DECIMALS = 6;
 
-export const CARGO_REGISTRY_ADDRESS = '0x734b0176702bD7CCaeCbC514936fdC9a4AfaD4F8' as const;
-export const CARGO_ESCROW_ADDRESS = '0x3458500909f123213A765293794a22C2d1e2e548' as const;
+export const CARGO_REGISTRY_ADDRESS = '0x2b27B16F0AAf518FF91690Df2B4FA39C5f5BCe99' as const;
+export const CARGO_ESCROW_ADDRESS = '0x935603281481F1c9acf1454964FF5DA7EBfc8Ff9' as const;
 
 // ─── Minimal USDC ABI (for balances and approvals) ───
 export const USDC_ABI = [
@@ -62,6 +62,9 @@ export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
-export const AGENT_REGISTRY_ADDRESS = '0x7B5d417b275e063dC50d0De85404CC018403DE9A' as const;
+export const AGENT_REGISTRY_ADDRESS = '0x33af1Df6e803E6ceAAF06615e85eA5732C44522C' as const;
 
-export const VERIFIER_REGISTRY_ADDRESS = '0x594ecf184A8C6E455997f5AdB6a0a1FCEA229dA1' as const;
+export const VERIFIER_REGISTRY_ADDRESS = '0xc2c23E68C55C2d598bdA0B6a8e7C570A79fe3A42' as const;
+
+export const CROP_LENDING_POOL_ADDRESS = '0xDE647D20c6A05A4a5f9D31f35496A08E443e9869' as const;
+

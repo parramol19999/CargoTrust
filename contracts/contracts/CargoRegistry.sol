@@ -35,6 +35,12 @@ interface IVerifierRegistry {
     function incrementReputation(address verifier) external;
 }
 
+interface ICropLendingPool {
+    function getBorrower(uint256 tokenId) external view returns (address);
+    function getRepaymentAmount(uint256 tokenId) external view returns (uint256);
+    function settleLoanFromRegistry(uint256 tokenId) external;
+}
+
 contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     // --- Core Traceability State ---
     struct CargoBatch {
@@ -71,6 +77,7 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     address public cargoEscrow;
     address public agentRegistry;
     address public verifierRegistry;
+    address public lendingPool;
     mapping(uint256 => uint256) public tokenEscrowJobs;
     mapping(uint256 => address) public designatedEvaluators;
 
@@ -149,6 +156,10 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
     function setVerifierRegistry(address _verifierRegistry) external onlyOwner {
         verifierRegistry = _verifierRegistry;
+    }
+
+    function setLendingPool(address _lendingPool) external onlyOwner {
+        lendingPool = _lendingPool;
     }
 
     function setFeeCollector(address _feeCollector) external onlyOwner {
@@ -294,11 +305,18 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
         require(buyer != seller, "Buyer cannot be seller");
 
+        address actualSeller = seller;
+        uint256 routeRepayment = 0;
+        if (lendingPool != address(0) && seller == lendingPool) {
+            actualSeller = ICropLendingPool(lendingPool).getBorrower(_tokenId);
+            routeRepayment = ICropLendingPool(lendingPool).getRepaymentAmount(_tokenId);
+        }
+
         // Calculate platform commission and seller shares
         uint256 commission = (price * platformCommissionBps) / 10000;
         uint256 sellerAmount = price - commission;
 
-        // Atomic Payment: Transfer listed token directly from buyer to feeCollector & seller/escrow
+        // Atomic Payment: Transfer listed token directly from buyer to feeCollector & seller/escrow/lendingPool
         if (commission > 0) {
             require(
                 IERC20(listedToken).transferFrom(buyer, feeCollector, commission),
@@ -306,27 +324,38 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
             );
         }
 
-        if (cargoEscrow != address(0)) {
+        if (routeRepayment > 0) {
             require(
-                IERC20(listedToken).transferFrom(buyer, cargoEscrow, sellerAmount),
-                "Escrow payment transfer failed"
+                IERC20(listedToken).transferFrom(buyer, lendingPool, routeRepayment),
+                "Lending pool repayment failed"
             );
-            address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
-            uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
-                _tokenId,
-                buyer,
-                seller,
-                evaluator,
-                listedToken,
-                sellerAmount,
-                block.timestamp + 7 days
-            );
-            tokenEscrowJobs[_tokenId] = jobId;
-        } else {
-            require(
-                IERC20(listedToken).transferFrom(buyer, seller, sellerAmount),
-                "Payment failed"
-            );
+            ICropLendingPool(lendingPool).settleLoanFromRegistry(_tokenId);
+        }
+
+        uint256 surplus = sellerAmount - routeRepayment;
+        if (surplus > 0) {
+            if (cargoEscrow != address(0)) {
+                require(
+                    IERC20(listedToken).transferFrom(buyer, cargoEscrow, surplus),
+                    "Escrow payment transfer failed"
+                );
+                address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
+                uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
+                    _tokenId,
+                    buyer,
+                    actualSeller,
+                    evaluator,
+                    listedToken,
+                    surplus,
+                    block.timestamp + 7 days
+                );
+                tokenEscrowJobs[_tokenId] = jobId;
+            } else {
+                require(
+                    IERC20(listedToken).transferFrom(buyer, actualSeller, surplus),
+                    "Payment failed"
+                );
+            }
         }
 
         // Atomic Ownership Transfer
@@ -336,7 +365,7 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
         batch.isForSale = false;
         batch.status = "Ownership Transferred";
 
-        emit CargoPurchased(_tokenId, seller, buyer, price);
+        emit CargoPurchased(_tokenId, actualSeller, buyer, price);
         emit StatusUpdated(_tokenId, "Ownership Transferred");
     }
 
@@ -362,6 +391,13 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
         require(buyer != seller, "Buyer cannot be seller");
 
+        address actualSeller = seller;
+        uint256 routeRepayment = 0;
+        if (lendingPool != address(0) && seller == lendingPool) {
+            actualSeller = ICropLendingPool(lendingPool).getBorrower(_tokenId);
+            routeRepayment = ICropLendingPool(lendingPool).getRepaymentAmount(_tokenId);
+        }
+
         if (_paymentToken == listedToken) {
             // Pay directly in the listed currency
             uint256 commission = (listedPrice * platformCommissionBps) / 10000;
@@ -374,27 +410,38 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
                 );
             }
 
-            if (cargoEscrow != address(0)) {
+            if (routeRepayment > 0) {
                 require(
-                    IERC20(listedToken).transferFrom(buyer, cargoEscrow, sellerAmount),
-                    "Escrow payment transfer failed"
+                    IERC20(listedToken).transferFrom(buyer, lendingPool, routeRepayment),
+                    "Lending pool repayment failed"
                 );
-                address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
-                uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
-                    _tokenId,
-                    buyer,
-                    seller,
-                    evaluator,
-                    listedToken,
-                    sellerAmount,
-                    block.timestamp + 7 days
-                );
-                tokenEscrowJobs[_tokenId] = jobId;
-            } else {
-                require(
-                    IERC20(listedToken).transferFrom(buyer, seller, sellerAmount),
-                    "Payment failed"
-                );
+                ICropLendingPool(lendingPool).settleLoanFromRegistry(_tokenId);
+            }
+
+            uint256 surplus = sellerAmount - routeRepayment;
+            if (surplus > 0) {
+                if (cargoEscrow != address(0)) {
+                    require(
+                        IERC20(listedToken).transferFrom(buyer, cargoEscrow, surplus),
+                        "Escrow payment transfer failed"
+                    );
+                    address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
+                    uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
+                        _tokenId,
+                        buyer,
+                        actualSeller,
+                        evaluator,
+                        listedToken,
+                        surplus,
+                        block.timestamp + 7 days
+                    );
+                    tokenEscrowJobs[_tokenId] = jobId;
+                } else {
+                    require(
+                        IERC20(listedToken).transferFrom(buyer, actualSeller, surplus),
+                        "Payment failed"
+                    );
+                }
             }
         } else {
             // Cross-currency payment (e.g. paying EURC for USDC listing)
@@ -419,28 +466,39 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
             uint256 commission = (listedPrice * platformCommissionBps) / 10000;
             uint256 sellerAmount = listedPrice - commission;
 
-            if (cargoEscrow != address(0)) {
-                // Route seller portion to escrow from feeCollector
+            if (routeRepayment > 0) {
                 require(
-                    IERC20(listedToken).transferFrom(feeCollector, cargoEscrow, sellerAmount),
-                    "USDC routing to escrow failed"
+                    IERC20(listedToken).transferFrom(feeCollector, lendingPool, routeRepayment),
+                    "Lending pool repayment failed"
                 );
-                address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
-                uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
-                    _tokenId,
-                    buyer,
-                    seller,
-                    evaluator,
-                    listedToken,
-                    sellerAmount,
-                    block.timestamp + 7 days
-                );
-                tokenEscrowJobs[_tokenId] = jobId;
-            } else {
-                require(
-                    IERC20(listedToken).transferFrom(feeCollector, seller, sellerAmount),
-                    "USDC settlement from treasury failed"
-                );
+                ICropLendingPool(lendingPool).settleLoanFromRegistry(_tokenId);
+            }
+
+            uint256 surplus = sellerAmount - routeRepayment;
+            if (surplus > 0) {
+                if (cargoEscrow != address(0)) {
+                    // Route seller portion to escrow from feeCollector
+                    require(
+                        IERC20(listedToken).transferFrom(feeCollector, cargoEscrow, surplus),
+                        "USDC routing to escrow failed"
+                    );
+                    address evaluator = designatedEvaluators[_tokenId] == address(0) ? feeCollector : designatedEvaluators[_tokenId];
+                    uint256 jobId = ICargoEscrow(cargoEscrow).createJobAndFund(
+                        _tokenId,
+                        buyer,
+                        actualSeller,
+                        evaluator,
+                        listedToken,
+                        surplus,
+                        block.timestamp + 7 days
+                    );
+                    tokenEscrowJobs[_tokenId] = jobId;
+                } else {
+                    require(
+                        IERC20(listedToken).transferFrom(feeCollector, actualSeller, surplus),
+                        "USDC settlement from treasury failed"
+                    );
+                }
             }
         }
 
@@ -449,7 +507,7 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
         batch.isForSale = false;
         batch.status = "Ownership Transferred";
 
-        emit CargoPurchased(_tokenId, seller, buyer, listedPrice);
+        emit CargoPurchased(_tokenId, actualSeller, buyer, listedPrice);
         emit StatusUpdated(_tokenId, "Ownership Transferred");
     }
 
@@ -565,15 +623,16 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
     // --- Custom Query Helper for Frontend UI (Zero Mocking) ---
     function getActiveBatches() external view returns (uint256[] memory, address[] memory, string[] memory) {
-        uint256 total = nextTokenId - 1;
+        uint256 total = totalSupply();
         uint256[] memory ids = new uint256[](total);
         address[] memory currentOwners = new address[](total);
         string[] memory statuses = new string[](total);
         
-        for (uint256 i = 1; i <= total; i++) {
-            ids[i - 1] = i;
-            currentOwners[i - 1] = ownerOf(i);
-            statuses[i - 1] = cargoBatches[i].status;
+        for (uint256 i = 0; i < total; i++) {
+            uint256 tokenId = tokenByIndex(i);
+            ids[i] = tokenId;
+            currentOwners[i] = ownerOf(tokenId);
+            statuses[i] = cargoBatches[tokenId].status;
         }
         return (ids, currentOwners, statuses);
     }
