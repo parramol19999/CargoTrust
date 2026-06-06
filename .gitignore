@@ -61,3 +61,12 @@ Thumbs.db
 *.sln
 *.swp
 *.swo
+
+# Local simulated DBs and session credentials
+.circle-session.json
+*.json-db
+*db.json
+web/*_db.json
+web/telemetry_db.json
+web/agents_db.json
+

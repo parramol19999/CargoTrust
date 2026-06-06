@@ -7,12 +7,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "telemetry:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('telemetry_db.json')) fs.writeFileSync('telemetry_db.json', '[]');\""
   },
   "dependencies": {
-    "@circle-fin/adapter-viem-v2": "^1.1.2",
+    "@circle-fin/adapter-viem-v2": "^1.11.2",
     "@circle-fin/app-kit": "^1.1.2",
+    "@circle-fin/bridge-kit": "^1.10.2",
     "@circle-fin/developer-controlled-wallets": "^1.2.0",
+    "@circle-fin/user-controlled-wallets": "^10.6.0",
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@rainbow-me/rainbowkit": "^2.2.3",
     "@tanstack/react-query": "^5.28.6",
     "clsx": "^2.1.0",
