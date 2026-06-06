@@ -11,11 +11,14 @@ export default {
       viaIR: true,
       optimizer: {
         enabled: true,
-        runs: 200
+        runs: 50
       }
     }
   },
   networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
     arcTestnet: {
       url: process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],

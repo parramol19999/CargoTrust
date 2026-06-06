@@ -77,6 +77,21 @@ async function main() {
   fs.writeFileSync(verifierAbiPath, JSON.stringify(verifierAbi, null, 2));
   console.log("VerifierRegistry ABI saved to:", verifierAbiPath);
 
+  // Load CropLendingPool Artifact
+  const lendingArtifactPath = path.resolve(process.cwd(), "artifacts/contracts/CropLendingPool.sol/CropLendingPool.json");
+  if (!fs.existsSync(lendingArtifactPath)) {
+    console.error("Error: CropLendingPool Artifact not found. Run compile first.");
+    process.exit(1);
+  }
+  const lendingArtifact = JSON.parse(fs.readFileSync(lendingArtifactPath, "utf8"));
+  const lendingAbi = lendingArtifact.abi;
+  const lendingBytecode = lendingArtifact.bytecode;
+
+  // Save CropLendingPool ABI for frontend
+  const lendingAbiPath = path.resolve(frontendComponentsDir, "CropLendingPoolABI.json");
+  fs.writeFileSync(lendingAbiPath, JSON.stringify(lendingAbi, null, 2));
+  console.log("CropLendingPool ABI saved to:", lendingAbiPath);
+
   // Deploy Setup
   console.log("Connecting to Arc Testnet...");
   const provider = new ethers.JsonRpcProvider(process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network");
@@ -155,6 +170,21 @@ async function main() {
   await linkCargoTx.wait();
   console.log("Linked CargoRegistry to VerifierRegistry!");
 
+  // Deploy CropLendingPool
+  console.log("Deploying CropLendingPool contract...");
+  const lendingPoolFactory = new ethers.ContractFactory(lendingAbi, lendingBytecode, wallet);
+  const cropLendingPool = await lendingPoolFactory.deploy(registryAddress, usdcAddress);
+  console.log("Waiting for CropLendingPool deployment confirmation...");
+  await cropLendingPool.waitForDeployment();
+  const lendingPoolAddress = await cropLendingPool.getAddress();
+  console.log("CropLendingPool deployed to:", lendingPoolAddress);
+
+  // Link CropLendingPool on CargoRegistry
+  console.log("Linking CropLendingPool to CargoRegistry...");
+  const linkLendingPoolTx = await cargoRegistry.setLendingPool(lendingPoolAddress);
+  await linkLendingPoolTx.wait();
+  console.log("Linked CropLendingPool to CargoRegistry!");
+
   // Ensure frontend lib directory exists
   const frontendLibDir = path.resolve(process.cwd(), "../web/src/lib");
   if (!fs.existsSync(frontendLibDir)) {
@@ -201,6 +231,15 @@ async function main() {
     } else {
       constantsContent += `\nexport const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;\n`;
     }
+
+    if (constantsContent.includes("CROP_LENDING_POOL_ADDRESS")) {
+      constantsContent = constantsContent.replace(
+        /export const CROP_LENDING_POOL_ADDRESS = '0x[a-fA-F0-9]+' as const;/,
+        `export const CROP_LENDING_POOL_ADDRESS = '${lendingPoolAddress}' as const;`
+      );
+    } else {
+      constantsContent += `\nexport const CROP_LENDING_POOL_ADDRESS = '${lendingPoolAddress}' as const;\n`;
+    }
   } else {
     constantsContent = `// ─── Arc Testnet Chain & Contract Constants ───
 export const ARC_TESTNET_CHAIN_ID = 5042002;
@@ -215,6 +254,7 @@ export const CARGO_REGISTRY_ADDRESS = '${registryAddress}' as const;
 export const CARGO_ESCROW_ADDRESS = '${escrowAddress}' as const;
 export const AGENT_REGISTRY_ADDRESS = '${agentRegistryAddress}' as const;
 export const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;
+export const CROP_LENDING_POOL_ADDRESS = '${lendingPoolAddress}' as const;
 `;
   }
   fs.writeFileSync(constantsPath, constantsContent);
@@ -225,6 +265,7 @@ export const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;
   console.log("Escrow Address:", escrowAddress);
   console.log("Agent Registry Address:", agentRegistryAddress);
   console.log("Verifier Registry Address:", verifierRegistryAddress);
+  console.log("Crop Lending Pool Address:", lendingPoolAddress);
   console.log("Network: Arc Testnet (5042002)");
   console.log("USDC ERC20:", usdcAddress);
   console.log("Explorer: https://testnet.arcscan.app/address/" + registryAddress);
