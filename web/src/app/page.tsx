@@ -5,10 +5,13 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import TwinCreator from '@/components/TwinCreator';
 import OwnershipTransfer from '@/components/OwnershipTransfer';
+import EscrowDashboard from '@/components/EscrowDashboard';
+import AgentConsole from '@/components/AgentConsole';
 import { Leaf, Award, Cpu, ShieldCheck } from 'lucide-react';
 
 export default function OperationsDesk() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [activeTab, setActiveTab] = useState<'desk' | 'escrow' | 'agents'>('desk');
 
   const handleMintSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -52,32 +55,88 @@ export default function OperationsDesk() {
           </div>
         </div>
 
-        {/* Dynamic Two-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Feature A: Crop Creator Left Column */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <span className="w-1 h-4 bg-gray-900 rounded-full" />
-              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
-                Supply Chain Entry Anchor
-              </h2>
-            </div>
-            <TwinCreator onMintSuccess={handleMintSuccess} />
-          </div>
-
-          {/* Feature B: Operations Listings Right Column */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <span className="w-1 h-4 bg-gray-900 rounded-full" />
-              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
-                Active B2B Listings & Settlements
-              </h2>
-            </div>
-            <OwnershipTransfer refreshTrigger={refreshTrigger} />
-          </div>
-
+        {/* Tab Selection */}
+        <div className="flex border-b border-gray-250 gap-1.5 px-1">
+          <button
+            onClick={() => setActiveTab('desk')}
+            className={`px-5 py-3 border-b-2 font-bold text-xs tracking-wider uppercase transition-all duration-200 ${
+              activeTab === 'desk'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-950'
+            }`}
+          >
+            Sourcing & Trading Desk
+          </button>
+          <button
+            onClick={() => setActiveTab('escrow')}
+            className={`px-5 py-3 border-b-2 font-bold text-xs tracking-wider uppercase transition-all duration-200 ${
+              activeTab === 'escrow'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-950'
+            }`}
+          >
+            Escrow Manager
+          </button>
+          <button
+            onClick={() => setActiveTab('agents')}
+            className={`px-5 py-3 border-b-2 font-bold text-xs tracking-wider uppercase transition-all duration-200 ${
+              activeTab === 'agents'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-950'
+            }`}
+          >
+            Agent Registry
+          </button>
         </div>
+
+        {activeTab === 'desk' ? (
+          /* Dynamic Two-Column Layout */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Feature A: Crop Creator Left Column */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <span className="w-1 h-4 bg-gray-900 rounded-full" />
+                <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                  Supply Chain Entry Anchor
+                </h2>
+              </div>
+              <TwinCreator onMintSuccess={handleMintSuccess} />
+            </div>
+
+            {/* Feature B: Operations Listings Right Column */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <span className="w-1 h-4 bg-gray-900 rounded-full" />
+                <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                  Active B2B Listings & Settlements
+                </h2>
+              </div>
+              <OwnershipTransfer refreshTrigger={refreshTrigger} />
+            </div>
+
+          </div>
+        ) : activeTab === 'escrow' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-4 bg-gray-900 rounded-full" />
+              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                Contract Escrow Dashboard
+              </h2>
+            </div>
+            <EscrowDashboard />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-4 bg-gray-900 rounded-full" />
+              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                IoT Autonomous Agent Console
+              </h2>
+            </div>
+            <AgentConsole />
+          </div>
+        )}
 
       </main>
 

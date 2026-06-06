@@ -7,7 +7,11 @@ export const ARC_TESTNET_EXPLORER = 'https://testnet.arcscan.app';
 export const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as const;
 export const USDC_DECIMALS = 6;
 
-export const CARGO_REGISTRY_ADDRESS = '0xAb67E0c298250d4714c3a06Ea951aAF11c17014b' as const;
+export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a' as const;
+export const EURC_DECIMALS = 6;
+
+export const CARGO_REGISTRY_ADDRESS = '0xE55F66FeAdd3AF36D9A8F0D9fC6A639891be6578' as const;
+export const CARGO_ESCROW_ADDRESS = '0x3eb7De7Ae1940B52Fe79394F04eA0238c0D6F2A4' as const;
 
 // ─── Minimal USDC ABI (for balances and approvals) ───
 export const USDC_ABI = [
@@ -57,3 +61,5 @@ export function truncateAddress(address: string, chars = 4): string {
 export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
+
+export const AGENT_REGISTRY_ADDRESS = '0x798Ef21Cf6C077863c6F995De401edf64BBCE767' as const;
