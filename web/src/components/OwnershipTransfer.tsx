@@ -59,74 +59,64 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
   // 2. Fetch all batch details in parallel from RPC
   useEffect(() => {
     async function loadAllBatches() {
-      if (!publicClient || !nextTokenId) return;
       setLoading(true);
       setErrorMsg('');
       try {
-        const total = Number(nextTokenId.toString()) - 1;
-        const loadedBatches = [];
+        const res = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              query GetCargoTwins {
+                cargoTwins {
+                  id
+                  tokenId
+                  producer
+                  origin
+                  harvestDate
+                  latLong
+                  ipfsMetadata
+                  owner
+                  priceUsdc
+                  isForSale
+                  status
+                  weight
+                }
+              }
+            `
+          })
+        });
+        
+        const { data } = await res.json();
+        const twins = data?.cargoTwins || [];
 
-        for (let i = 1; i <= total; i++) {
-          const details: any = await publicClient.readContract({
-            address: CARGO_REGISTRY_ADDRESS,
-            abi: CARGO_REGISTRY_ABI,
-            functionName: 'cargoBatches',
-            args: [BigInt(i)],
-          });
-
-          const ownerAddress: any = await publicClient.readContract({
-            address: CARGO_REGISTRY_ADDRESS,
-            abi: CARGO_REGISTRY_ABI,
-            functionName: 'ownerOf',
-            args: [BigInt(i)],
-          });
-
-          // Struct layout: producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status, paymentToken, isEncrypted, encryptedPrice, weight
-          const [
-            producer,
-            origin,
-            harvestDate,
-            latLong,
-            ipfsMetadata,
-            priceUsdc,
-            isForSale,
-            status,
-            paymentToken,
-            isEncrypted,
-            encryptedPrice,
-            weight
-          ] = details;
-
+        const loadedBatches = twins.map((twin: any) => {
           let parsedDesc = 'Batch details on-chain';
-          if (ipfsMetadata.includes('?desc=')) {
-            parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
+          if (twin.ipfsMetadata.includes('?desc=')) {
+            parsedDesc = decodeURIComponent(twin.ipfsMetadata.split('?desc=')[1]);
           }
 
-          const resolvedPaymentToken = (paymentToken && paymentToken !== '0x0000000000000000000000000000000000000000') 
-            ? paymentToken 
-            : USDC_ADDRESS;
-
-          loadedBatches.push({
-            id: i,
-            producer,
-            origin,
-            harvestDate: Number(harvestDate.toString()) * 1000,
-            latLong,
-            ipfsMetadata,
+          return {
+            id: Number(twin.id),
+            producer: twin.producer,
+            origin: twin.origin,
+            harvestDate: Number(twin.harvestDate.toString()) * 1000,
+            latLong: twin.latLong,
+            ipfsMetadata: twin.ipfsMetadata,
             description: parsedDesc,
-            priceUsdc: BigInt(priceUsdc.toString()),
-            isForSale,
-            status,
-            owner: ownerAddress,
-            paymentToken: resolvedPaymentToken,
-            weight: weight ? BigInt(weight.toString()) : 100n
-          });
-        }
+            priceUsdc: BigInt(twin.priceUsdc || '0'),
+            isForSale: twin.isForSale,
+            status: twin.status,
+            owner: twin.owner,
+            paymentToken: USDC_ADDRESS,
+            weight: BigInt(twin.weight || 100)
+          };
+        });
 
         setBatches(loadedBatches.reverse());
       } catch (err: any) {
         console.error(err);
-        setErrorMsg('Error loading on-chain batches from Arc Testnet RPC.');
+        setErrorMsg('Error loading on-chain batches from GraphQL indexer.');
       } finally {
         setLoading(false);
       }

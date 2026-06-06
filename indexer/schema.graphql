@@ -1,0 +1,34 @@
+type CargoTwin @entity {
+  id: ID!
+  tokenId: BigInt!
+  producer: String!
+  origin: String!
+  harvestDate: BigInt!
+  latLong: String!
+  ipfsMetadata: String!
+  owner: String!
+  priceUsdc: BigInt
+  isForSale: Boolean!
+  status: String!
+  weight: BigInt
+  verifications: [Verification!]! @derivedFrom(field: "cargoTwin")
+  transitions: [CustodyTransition!]! @derivedFrom(field: "cargoTwin")
+}
+
+type Verification @entity {
+  id: ID!
+  cargoTwin: CargoTwin!
+  verifier: String!
+  credentialType: String!
+  ipfsVcHash: String!
+  timestamp: BigInt!
+}
+
+type CustodyTransition @entity {
+  id: ID!
+  cargoTwin: CargoTwin!
+  from: String!
+  to: String!
+  priceUsdc: BigInt
+  timestamp: BigInt!
+}

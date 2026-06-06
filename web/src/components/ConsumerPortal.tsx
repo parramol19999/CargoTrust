@@ -28,6 +28,7 @@ import { generateClientPaymentToken, TelemetryLog } from '@/lib/nanopayments';
 import TelemetryChart from '@/components/TelemetryChart';
 import AccessRequestPanel from '@/components/AccessRequestPanel';
 import LineageTree from '@/components/LineageTree';
+import ProvenanceMap from '@/components/ProvenanceMap';
 
 export default function ConsumerPortal() {
   const searchParams = useSearchParams();
@@ -139,74 +140,77 @@ export default function ConsumerPortal() {
       setDecryptError('');
 
       try {
-        const details: any = await publicClient.readContract({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'cargoBatches',
-          args: [BigInt(activeTokenId)],
+        const res = await fetch('/api/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              query GetCargoTwin($id: ID!) {
+                cargoTwinById(id: $id) {
+                  id
+                  tokenId
+                  producer
+                  origin
+                  harvestDate
+                  latLong
+                  ipfsMetadata
+                  owner
+                  priceUsdc
+                  isForSale
+                  status
+                  isEncrypted
+                  encryptedPrice
+                  weight
+                }
+              }
+            `,
+            variables: { id: activeTokenId.toString() }
+          })
         });
 
-        const ownerAddress: any = await publicClient.readContract({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'ownerOf',
-          args: [BigInt(activeTokenId)],
-        });
+        const { data } = await res.json();
+        const twin = data?.cargoTwinById;
+
+        if (!twin) {
+          setErrorMsg(`Crop Token ID #${activeTokenId} does not exist in our global provenance registry.`);
+          setLoading(false);
+          return;
+        }
 
         const verifs: any = await publicClient.readContract({
           address: CARGO_REGISTRY_ADDRESS,
           abi: CARGO_REGISTRY_ABI,
           functionName: 'getVerifications',
           args: [BigInt(activeTokenId)],
-        });
-
-        const [
-          producer,
-          origin,
-          harvestDate,
-          latLong,
-          ipfsMetadata,
-          priceUsdc,
-          isForSale,
-          status,
-          paymentToken,
-          isEncrypted,
-          encryptedPrice,
-          weight
-        ] = details;
-
-        if (producer === '0x0000000000000000000000000000000000000000') {
-          setErrorMsg(`Crop Token ID #${activeTokenId} does not exist in our global provenance registry.`);
-          return;
-        }
+        }).catch(() => []);
 
         let parsedDesc = 'Batch details on-chain';
-        if (ipfsMetadata.includes('?desc=')) {
-          parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
+        if (twin.ipfsMetadata.includes('?desc=')) {
+          parsedDesc = decodeURIComponent(twin.ipfsMetadata.split('?desc=')[1]);
         }
 
         const cargoRecord = {
           id: activeTokenId,
-          producer,
-          origin,
-          harvestDate: Number(harvestDate.toString()) * 1000,
-          latLong,
-          ipfsMetadata,
+          producer: twin.producer,
+          origin: twin.origin,
+          harvestDate: Number(twin.harvestDate.toString()) * 1000,
+          latLong: twin.latLong,
+          ipfsMetadata: twin.ipfsMetadata,
           description: parsedDesc,
-          priceUsdc: BigInt(priceUsdc.toString()),
-          isForSale,
-          status,
-          isEncrypted: !!isEncrypted,
-          encryptedPrice: encryptedPrice || '',
-          weight: weight ? BigInt(weight.toString()) : 100n
+          priceUsdc: BigInt(twin.priceUsdc || '0'),
+          isForSale: twin.isForSale,
+          status: twin.status,
+          isEncrypted: !!twin.isEncrypted,
+          encryptedPrice: twin.encryptedPrice || '',
+          weight: BigInt(twin.weight || 100)
         };
 
         setCargo(cargoRecord);
-        setOwner(ownerAddress);
+        setOwner(twin.owner);
         setVerifications(verifs);
 
         // Attempt decryption automatically if a key is stored locally for this token
-        if (isEncrypted) {
+        if (twin.isEncrypted) {
           const localKey = localStorage.getItem(`crop_key_${activeTokenId}`);
           if (localKey || address) {
             try {
@@ -215,13 +219,13 @@ export default function ConsumerPortal() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   tokenId: activeTokenId,
-                  requester: address || producer,
-                  producer,
+                  requester: address || twin.producer,
+                  producer: twin.producer,
                   encryptedData: {
-                    origin,
-                    latLong,
+                    origin: twin.origin,
+                    latLong: twin.latLong,
                     description: parsedDesc,
-                    price: encryptedPrice || '',
+                    price: twin.encryptedPrice || '',
                   }
                 }),
               });
@@ -414,8 +418,19 @@ export default function ConsumerPortal() {
             </div>
 
             {activeTab === 'provenance' ? (
-              /* Flight-Itinerary Stepper Timeline */
-              <div className="space-y-8 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+              <div className="space-y-6">
+                <ProvenanceMap 
+                  latLong={
+                    cargo.isEncrypted && decryptedData
+                      ? decryptedData.latLong
+                      : cargo.latLong
+                  }
+                  verifications={verifications}
+                  status={cargo.status}
+                />
+
+                {/* Flight-Itinerary Stepper Timeline */}
+                <div className="space-y-8 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
                 {/* Node 1: Producer Sourcing */}
                 <div className="relative pl-10 animate-fade-in">
                   <div className="absolute left-[8px] top-1.5 w-5 h-5 rounded-full border-2 border-gray-950 bg-white flex items-center justify-center z-10">
@@ -566,6 +581,7 @@ export default function ConsumerPortal() {
                 </div>
 
               </div>
+            </div>
             ) : (
               /* Telemetry Streaming Portal */
               <div className="space-y-6">
