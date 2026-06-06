@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { usePublicClient } from 'wagmi';
+import { usePublicClient, useAccount } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { 
@@ -26,11 +26,14 @@ import {
 import { formatUnits } from 'viem';
 import { generateClientPaymentToken, TelemetryLog } from '@/lib/nanopayments';
 import TelemetryChart from '@/components/TelemetryChart';
+import AccessRequestPanel from '@/components/AccessRequestPanel';
+import LineageTree from '@/components/LineageTree';
 
 export default function ConsumerPortal() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const publicClient = usePublicClient();
+  const { address } = useAccount();
 
   const [tokenIdInput, setTokenIdInput] = useState('');
   const [activeTokenId, setActiveTokenId] = useState<number | null>(null);
@@ -41,6 +44,12 @@ export default function ConsumerPortal() {
   const [verifications, setVerifications] = useState<any[]>([]);
   const [owner, setOwner] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Privacy and Decryption states
+  const [decryptedData, setDecryptedData] = useState<any | null>(null);
+  const [decryptLoading, setDecryptLoading] = useState(false);
+  const [decryptError, setDecryptError] = useState('');
+  const [refreshPrivacyTrigger, setRefreshPrivacyTrigger] = useState(0);
 
   // Telemetry Stream State (x402 nanopayments)
   const [activeTab, setActiveTab] = useState<'provenance' | 'telemetry'>('provenance');
@@ -126,6 +135,8 @@ export default function ConsumerPortal() {
       setErrorMsg('');
       setCargo(null);
       setVerifications([]);
+      setDecryptedData(null);
+      setDecryptError('');
 
       try {
         const details: any = await publicClient.readContract({
@@ -149,7 +160,20 @@ export default function ConsumerPortal() {
           args: [BigInt(activeTokenId)],
         });
 
-        const [producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status] = details;
+        const [
+          producer,
+          origin,
+          harvestDate,
+          latLong,
+          ipfsMetadata,
+          priceUsdc,
+          isForSale,
+          status,
+          paymentToken,
+          isEncrypted,
+          encryptedPrice,
+          weight
+        ] = details;
 
         if (producer === '0x0000000000000000000000000000000000000000') {
           setErrorMsg(`Crop Token ID #${activeTokenId} does not exist in our global provenance registry.`);
@@ -161,7 +185,7 @@ export default function ConsumerPortal() {
           parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
         }
 
-        setCargo({
+        const cargoRecord = {
           id: activeTokenId,
           producer,
           origin,
@@ -172,10 +196,44 @@ export default function ConsumerPortal() {
           priceUsdc: BigInt(priceUsdc.toString()),
           isForSale,
           status,
-        });
+          isEncrypted: !!isEncrypted,
+          encryptedPrice: encryptedPrice || '',
+          weight: weight ? BigInt(weight.toString()) : 100n
+        };
 
+        setCargo(cargoRecord);
         setOwner(ownerAddress);
         setVerifications(verifs);
+
+        // Attempt decryption automatically if a key is stored locally for this token
+        if (isEncrypted) {
+          const localKey = localStorage.getItem(`crop_key_${activeTokenId}`);
+          if (localKey || address) {
+            try {
+              const decryptRes = await fetch('/api/privacy/decrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  tokenId: activeTokenId,
+                  requester: address || producer,
+                  producer,
+                  encryptedData: {
+                    origin,
+                    latLong,
+                    description: parsedDesc,
+                    price: encryptedPrice || '',
+                  }
+                }),
+              });
+              const decVal = await decryptRes.json();
+              if (decVal.success) {
+                setDecryptedData(decVal.decrypted);
+              }
+            } catch (decErr) {
+              console.error('Decryption failed:', decErr);
+            }
+          }
+        }
 
       } catch (err) {
         console.error(err);
@@ -186,7 +244,42 @@ export default function ConsumerPortal() {
     }
 
     fetchProvenance();
-  }, [publicClient, activeTokenId]);
+  }, [publicClient, activeTokenId, address, refreshPrivacyTrigger]);
+
+  const handleTryDecrypt = async () => {
+    if (!activeTokenId || !cargo) return;
+    setDecryptLoading(true);
+    setDecryptError('');
+    try {
+      const res = await fetch('/api/privacy/decrypt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokenId: activeTokenId,
+          requester: address || '',
+          producer: cargo.producer,
+          encryptedData: {
+            origin: cargo.origin,
+            latLong: cargo.latLong,
+            description: cargo.description,
+            price: cargo.encryptedPrice || '',
+          }
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setDecryptedData(data.decrypted);
+        setDecryptError('');
+      } else {
+        setDecryptError(data.error || 'Decryption unauthorized.');
+      }
+    } catch (err: any) {
+      setDecryptError(err.message || 'Decryption failed.');
+    } finally {
+      setDecryptLoading(false);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,17 +343,50 @@ export default function ConsumerPortal() {
           <div className="card-light p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
               <div>
-                <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
-                  CROP TOKEN ID: #{cargo.id}
-                </span>
-                <h4 className="text-lg font-bold text-gray-900 mt-1">{cargo.origin}</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
+                    CROP TOKEN ID: #{cargo.id}
+                  </span>
+                  <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
+                    WEIGHT: {cargo.weight ? cargo.weight.toString() : '100'} UNITS
+                  </span>
+                  {cargo.isEncrypted && (
+                    <span className={`px-2 py-0.5 text-[9px] font-mono font-bold rounded border uppercase tracking-wider ${
+                      decryptedData
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-red-50 text-red-600 border-red-200'
+                    }`}>
+                      {decryptedData ? '🔓 Decrypted' : '🔒 Encrypted'}
+                    </span>
+                  )}
+                  {cargo.isEncrypted && !decryptedData && (
+                    <button
+                      onClick={handleTryDecrypt}
+                      disabled={decryptLoading}
+                      className="px-2.5 py-1 bg-gray-950 hover:bg-gray-900 text-white rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1"
+                    >
+                      {decryptLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlock className="w-3 h-3" />}
+                      Decrypt Details
+                    </button>
+                  )}
+                </div>
+                {decryptError && (
+                  <span className="block text-[9px] text-red-600 font-mono mt-1">⚠️ {decryptError}</span>
+                )}
+                <h4 className="text-lg font-bold text-gray-900 mt-1">
+                  {cargo.isEncrypted
+                    ? decryptedData
+                      ? decryptedData.origin
+                      : 'Private Crop Batch 🔒'
+                    : cargo.origin}
+                </h4>
               </div>
               <div className="text-right">
                 <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold block">Current Custodian</span>
                 <span className="text-xs font-mono font-bold text-gray-900 select-all">
                   {owner}
                 </span>
-            </div>
+              </div>
 
             {/* Tab Selector */}
             <div className="flex border-b border-gray-150 mb-6">
@@ -290,13 +416,12 @@ export default function ConsumerPortal() {
             {activeTab === 'provenance' ? (
               /* Flight-Itinerary Stepper Timeline */
               <div className="space-y-8 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
-                
                 {/* Node 1: Producer Sourcing */}
                 <div className="relative pl-10 animate-fade-in">
                   <div className="absolute left-[8px] top-1.5 w-5 h-5 rounded-full border-2 border-gray-950 bg-white flex items-center justify-center z-10">
                     <div className="w-1.5 h-1.5 rounded-full bg-gray-950" />
                   </div>
-
+ 
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-700 border border-gray-200/60 rounded text-[9px] font-bold">
@@ -308,10 +433,22 @@ export default function ConsumerPortal() {
                         {new Date(cargo.harvestDate).toLocaleDateString()}
                       </span>
                     </div>
-
-                    <p className="text-sm font-bold text-gray-900">{cargo.origin}</p>
-                    <p className="text-xs text-gray-500 mt-1">{cargo.description}</p>
-
+ 
+                    <p className="text-sm font-bold text-gray-900">
+                      {cargo.isEncrypted
+                        ? decryptedData
+                          ? decryptedData.origin
+                          : 'Origin Details Encrypted 🔒'
+                        : cargo.origin}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {cargo.isEncrypted
+                        ? decryptedData
+                          ? decryptedData.description
+                          : `${cargo.description.slice(0, 32)}... (Encrypted Metadata Payload 🔒)`
+                        : cargo.description}
+                    </p>
+ 
                     <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200/60 text-[10px] font-mono text-gray-500">
                       <div>
                         <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">Producer Address</span>
@@ -321,7 +458,11 @@ export default function ConsumerPortal() {
                         <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">GPS Coordinates</span>
                         <span className="text-gray-900 font-bold flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-gray-400" />
-                          {cargo.latLong}
+                          {cargo.isEncrypted
+                            ? decryptedData
+                              ? decryptedData.latLong
+                              : 'Redacted (Encrypted 🔒)'
+                            : cargo.latLong}
                         </span>
                       </div>
                     </div>
@@ -404,6 +545,14 @@ export default function ConsumerPortal() {
                             : 'Not listed'}
                         </span>
                       </div>
+                      {cargo.isEncrypted && (
+                        <div className="flex justify-between border-t border-gray-100 pt-2 mt-2">
+                          <span className="text-gray-400">Target Harvest Price:</span>
+                          <span className="font-mono font-bold text-gray-900">
+                            {decryptedData ? `${decryptedData.price} USDC 🔓` : 'Redacted (Encrypted 🔒)'}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Verification Status:</span>
                         <span className="text-cyan-600 font-bold">{cargo.status}</span>
@@ -490,6 +639,14 @@ export default function ConsumerPortal() {
               </div>
             )}</div>
 
+          </div>
+
+          {/* Lineage and split provenance tree */}
+          <LineageTree activeTokenId={cargo.id} />
+
+          {/* Selective Cryptographic Disclosure / Sharing Desk */}
+          <div className="mt-8">
+            <AccessRequestPanel refreshTrigger={refreshPrivacyTrigger} />
           </div>
 
         </div>

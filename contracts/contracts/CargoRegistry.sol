@@ -30,6 +30,11 @@ interface IAgentRegistry {
     function isRegisteredAgent(address agentWallet) external view returns (bool);
 }
 
+interface IVerifierRegistry {
+    function isActiveVerifier(address verifier) external view returns (bool);
+    function incrementReputation(address verifier) external;
+}
+
 contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     // --- Core Traceability State ---
     struct CargoBatch {
@@ -42,6 +47,9 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
         bool isForSale;
         string status; // E.g., "Harvested", "In Transit", "Delivered", "Sold"
         address paymentToken; // Address of token (USDC or EURC)
+        bool isEncrypted;
+        string encryptedPrice;
+        uint256 weight;
     }
 
     struct Verification {
@@ -62,6 +70,7 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
     address public cargoEscrow;
     address public agentRegistry;
+    address public verifierRegistry;
     mapping(uint256 => uint256) public tokenEscrowJobs;
     mapping(uint256 => address) public designatedEvaluators;
 
@@ -69,6 +78,10 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     mapping(uint256 => Verification[]) public cargoVerifications;
     mapping(address => bool) public authorizedVerifiers;
     mapping(address => string) public verifierNames;
+    
+    // Parent-child ancestry mappings
+    mapping(uint256 => uint256) public parentTokenOf;
+    mapping(uint256 => uint256[]) public childTokensOf;
 
     // --- Events ---
     event CargoMinted(
@@ -79,6 +92,9 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
         string latLong,
         string ipfsMetadata
     );
+
+    event CargoSplitParent(uint256 indexed parentId, uint256[] childWeights);
+    event CargoSplitChild(uint256 indexed childId, uint256 indexed parentId, uint256 weight);
     
     event CargoListed(uint256 indexed tokenId, uint256 priceUsdc);
     
@@ -106,7 +122,13 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     }
 
     modifier onlyAuthorizedVerifier() {
-        require(authorizedVerifiers[msg.sender], "Caller is not an authorized verifier");
+        bool authorized = authorizedVerifiers[msg.sender];
+        if (!authorized && verifierRegistry != address(0)) {
+            try IVerifierRegistry(verifierRegistry).isActiveVerifier(msg.sender) returns (bool active) {
+                authorized = active;
+            } catch {}
+        }
+        require(authorized, "Caller is not an authorized verifier");
         _;
     }
 
@@ -123,6 +145,10 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     function setVerifier(address _verifier, bool _status, string calldata _name) external onlyOwner {
         authorizedVerifiers[_verifier] = _status;
         verifierNames[_verifier] = _name;
+    }
+
+    function setVerifierRegistry(address _verifierRegistry) external onlyOwner {
+        verifierRegistry = _verifierRegistry;
     }
 
     function setFeeCollector(address _feeCollector) external onlyOwner {
@@ -146,6 +172,54 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
         string calldata _latLong,
         string calldata _ipfsMetadata
     ) external nonReentrant returns (uint256) {
+        return _mintCargoInternal(_origin, _harvestDate, _latLong, _ipfsMetadata, false, "", 100);
+    }
+
+    function mintCargo(
+        string calldata _origin,
+        uint256 _harvestDate,
+        string calldata _latLong,
+        string calldata _ipfsMetadata,
+        uint256 _weight
+    ) external nonReentrant returns (uint256) {
+        return _mintCargoInternal(_origin, _harvestDate, _latLong, _ipfsMetadata, false, "", _weight);
+    }
+
+    /**
+     * @notice Mints a new digital twin batch with opt-in encryption parameters
+     */
+    function mintCargo(
+        string calldata _origin,
+        uint256 _harvestDate,
+        string calldata _latLong,
+        string calldata _ipfsMetadata,
+        bool _isEncrypted,
+        string calldata _encryptedPrice
+    ) external nonReentrant returns (uint256) {
+        return _mintCargoInternal(_origin, _harvestDate, _latLong, _ipfsMetadata, _isEncrypted, _encryptedPrice, 100);
+    }
+
+    function mintCargo(
+        string calldata _origin,
+        uint256 _harvestDate,
+        string calldata _latLong,
+        string calldata _ipfsMetadata,
+        bool _isEncrypted,
+        string calldata _encryptedPrice,
+        uint256 _weight
+    ) external nonReentrant returns (uint256) {
+        return _mintCargoInternal(_origin, _harvestDate, _latLong, _ipfsMetadata, _isEncrypted, _encryptedPrice, _weight);
+    }
+
+    function _mintCargoInternal(
+        string memory _origin,
+        uint256 _harvestDate,
+        string memory _latLong,
+        string memory _ipfsMetadata,
+        bool _isEncrypted,
+        string memory _encryptedPrice,
+        uint256 _weight
+    ) internal returns (uint256) {
         // Collect 0.10 USDC mint fee
         require(
             usdc.transferFrom(msg.sender, feeCollector, MINT_FEE_USDC),
@@ -167,7 +241,10 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
             priceUsdc: 0,
             isForSale: false,
             status: "Harvested",
-            paymentToken: address(usdc)
+            paymentToken: address(usdc),
+            isEncrypted: _isEncrypted,
+            encryptedPrice: _encryptedPrice,
+            weight: _weight
         });
 
         emit CargoMinted(tokenId, msg.sender, _origin, _harvestDate, _latLong, _ipfsMetadata);
@@ -401,11 +478,16 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
     ) external onlyAuthorizedVerifier {
         require(_ownerOf(_tokenId) != address(0), "Token does not exist");
         
+        string memory vName = verifierNames[msg.sender];
+        if (bytes(vName).length == 0) {
+            vName = "Stake-Backed Verifier";
+        }
+
         cargoVerifications[_tokenId].push(Verification({
             verifier: msg.sender,
             credentialType: _credentialType,
             ipfsVcHash: _ipfsVcHash,
-            verifierName: verifierNames[msg.sender],
+            verifierName: vName,
             timestamp: block.timestamp
         }));
 
@@ -414,6 +496,10 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
 
         emit CargoVerified(_tokenId, msg.sender, _credentialType, _ipfsVcHash);
         emit StatusUpdated(_tokenId, batch.status);
+
+        if (verifierRegistry != address(0)) {
+            try IVerifierRegistry(verifierRegistry).incrementReputation(msg.sender) {} catch {}
+        }
 
         if (cargoEscrow != address(0)) {
             uint256 jobId = tokenEscrowJobs[_tokenId];
@@ -490,6 +576,95 @@ contract CargoRegistry is ERC721, ERC721Enumerable, Ownable, ReentrancyGuard {
             statuses[i - 1] = cargoBatches[i].status;
         }
         return (ids, currentOwners, statuses);
+    }
+
+    /**
+     * @notice Splits a parent cargo batch into multiple child cargo batches with designated weights
+     */
+    function splitCargo(uint256 _parentId, uint256[] calldata _childWeights) external nonReentrant {
+        require(ownerOf(_parentId) == msg.sender, "Only owner can split");
+        CargoBatch storage parentBatch = cargoBatches[_parentId];
+        require(parentBatch.weight > 0, "Parent weight must be > 0");
+
+        uint256 totalChildWeight = 0;
+        for (uint256 i = 0; i < _childWeights.length; i++) {
+            require(_childWeights[i] > 0, "Child weight must be > 0");
+            totalChildWeight += _childWeights[i];
+        }
+        require(totalChildWeight == parentBatch.weight, "Sum of child weights must equal parent weight");
+
+        // Collect mint fees for child tokens from producer/owner
+        uint256 totalMintFee = MINT_FEE_USDC * _childWeights.length;
+        require(
+            usdc.transferFrom(msg.sender, feeCollector, totalMintFee),
+            "USDC split fee payment failed"
+        );
+
+        // Burn parent token
+        _burn(_parentId);
+        parentBatch.isForSale = false;
+        parentBatch.status = "Split";
+
+        // Mint child tokens
+        for (uint256 i = 0; i < _childWeights.length; i++) {
+            uint256 childId = nextTokenId++;
+            _mint(msg.sender, childId);
+
+            cargoBatches[childId] = CargoBatch({
+                producer: parentBatch.producer,
+                origin: parentBatch.origin,
+                harvestDate: parentBatch.harvestDate,
+                latLong: parentBatch.latLong,
+                ipfsMetadata: parentBatch.ipfsMetadata,
+                priceUsdc: 0,
+                isForSale: false,
+                status: string(abi.encodePacked("Split from #", uint2str(_parentId))),
+                paymentToken: parentBatch.paymentToken,
+                isEncrypted: parentBatch.isEncrypted,
+                encryptedPrice: parentBatch.encryptedPrice,
+                weight: _childWeights[i]
+            });
+
+            // Set ancestry relations
+            parentTokenOf[childId] = _parentId;
+            childTokensOf[_parentId].push(childId);
+
+            // Copy verifications from parent
+            uint256 parentVerificationsLength = cargoVerifications[_parentId].length;
+            for (uint256 j = 0; j < parentVerificationsLength; j++) {
+                cargoVerifications[childId].push(cargoVerifications[_parentId][j]);
+            }
+
+            emit CargoMinted(childId, parentBatch.producer, parentBatch.origin, parentBatch.harvestDate, parentBatch.latLong, parentBatch.ipfsMetadata);
+            emit CargoSplitChild(childId, _parentId, _childWeights[i]);
+        }
+
+        emit CargoSplitParent(_parentId, _childWeights);
+    }
+
+    function getChildTokens(uint256 _parentId) external view returns (uint256[] memory) {
+        return childTokensOf[_parentId];
+    }
+
+    function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint256 k = len;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+            bstr[k] = bytes1(temp);
+            _i /= 10;
+        }
+        return string(bstr);
     }
 
     // --- Required Overrides ---

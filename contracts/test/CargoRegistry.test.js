@@ -382,4 +382,78 @@ describe("CargoRegistry Contract Tests", function () {
       ).to.be.revertedWithCustomError(registry, "ReentrancyGuardReentrantCall");
     });
   });
+
+  describe("Batch Splitting", function () {
+    const SPLIT_MINT_FEE = 100000; // 0.10 USDC (6 decimals) per child
+
+    beforeEach(async function () {
+      // Mint cargo token 1 for producer first
+      await mockUsdc.connect(producer).approve(await cargoRegistry.getAddress(), SPLIT_MINT_FEE);
+      await cargoRegistry.connect(producer)["mintCargo(string,uint256,string,string,uint256)"]("Origin A", 12345, "Lat A", "ipfs A", 100);
+
+      // Set verifier
+      await cargoRegistry.setVerifier(verifier.address, true, "Mock QA Lab");
+      // Add verification on parent (token 1)
+      await cargoRegistry.connect(verifier).addVerification(1, "Organic Certified", "ipfs://parent-vc");
+    });
+
+    it("Should allow the token owner to split cargo NFT and inherit provenance/verifications", async function () {
+      // Producer approves enough USDC for split mint fees (2 children = 0.20 USDC)
+      await mockUsdc.connect(producer).approve(await cargoRegistry.getAddress(), SPLIT_MINT_FEE * 2);
+
+      // Parent weight is 100 (default)
+      // Perform split into 60 and 40
+      const tx = await cargoRegistry.connect(producer).splitCargo(1, [60, 40]);
+
+      // Parent token 1 should be burned
+      await expect(cargoRegistry.ownerOf(1)).to.be.revertedWithCustomError(cargoRegistry, "ERC721NonexistentToken").withArgs(1);
+
+      // Child tokens 2 and 3 should be minted
+      expect(await cargoRegistry.ownerOf(2)).to.equal(producer.address);
+      expect(await cargoRegistry.ownerOf(3)).to.equal(producer.address);
+
+      // Verify weights
+      const batch2 = await cargoRegistry.getCargoDetails(2);
+      const batch3 = await cargoRegistry.getCargoDetails(3);
+      expect(batch2.weight).to.equal(60);
+      expect(batch3.weight).to.equal(40);
+
+      // Verify statuses
+      expect(batch2.status).to.equal("Split from #1");
+      expect(batch3.status).to.equal("Split from #1");
+
+      // Verify parent-child links
+      expect(await cargoRegistry.parentTokenOf(2)).to.equal(1);
+      expect(await cargoRegistry.parentTokenOf(3)).to.equal(1);
+      
+      const children = await cargoRegistry.getChildTokens(1);
+      expect(children[0]).to.equal(2);
+      expect(children[1]).to.equal(3);
+
+      // Verify inherited verifications
+      const verifications2 = await cargoRegistry.getVerifications(2);
+      const verifications3 = await cargoRegistry.getVerifications(3);
+      expect(verifications2.length).to.equal(1);
+      expect(verifications3.length).to.equal(1);
+      expect(verifications2[0].ipfsVcHash).to.equal("ipfs://parent-vc");
+      expect(verifications3[0].ipfsVcHash).to.equal("ipfs://parent-vc");
+    });
+
+    it("Should fail if sum of child weights does not equal parent weight", async function () {
+      await mockUsdc.connect(producer).approve(await cargoRegistry.getAddress(), SPLIT_MINT_FEE * 2);
+
+      // Parent weight is 100. Sum of children is 50 + 40 = 90
+      await expect(
+        cargoRegistry.connect(producer).splitCargo(1, [50, 40])
+      ).to.be.revertedWith("Sum of child weights must equal parent weight");
+    });
+
+    it("Should fail if a non-owner tries to split the batch", async function () {
+      await mockUsdc.connect(producer).approve(await cargoRegistry.getAddress(), SPLIT_MINT_FEE * 2);
+
+      await expect(
+        cargoRegistry.connect(buyer).splitCargo(1, [60, 40])
+      ).to.be.revertedWith("Only owner can split");
+    });
+  });
 });

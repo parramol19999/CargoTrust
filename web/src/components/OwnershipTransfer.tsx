@@ -9,6 +9,7 @@ import { formatUnits, parseUnits } from 'viem';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
 import CrossChainPurchaseModal from '@/components/CrossChainPurchaseModal';
+import BatchSplitter from '@/components/BatchSplitter';
 
 export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?: number }) {
   const { address, isConnected } = useAccount();
@@ -19,6 +20,10 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
   // Cross-chain purchase state
   const [crossChainModalOpen, setCrossChainModalOpen] = useState(false);
   const [selectedCrossChainBatch, setSelectedCrossChainBatch] = useState<any | null>(null);
+
+  // Split Batch Modal State
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
+  const [selectedSplitBatch, setSelectedSplitBatch] = useState<any | null>(null);
 
   // On-chain Data State
   const [batches, setBatches] = useState<any[]>([]);
@@ -76,8 +81,21 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
             args: [BigInt(i)],
           });
 
-          // Struct layout: producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status, paymentToken
-          const [producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status, paymentToken] = details;
+          // Struct layout: producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status, paymentToken, isEncrypted, encryptedPrice, weight
+          const [
+            producer,
+            origin,
+            harvestDate,
+            latLong,
+            ipfsMetadata,
+            priceUsdc,
+            isForSale,
+            status,
+            paymentToken,
+            isEncrypted,
+            encryptedPrice,
+            weight
+          ] = details;
 
           let parsedDesc = 'Batch details on-chain';
           if (ipfsMetadata.includes('?desc=')) {
@@ -101,6 +119,7 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
             status,
             owner: ownerAddress,
             paymentToken: resolvedPaymentToken,
+            weight: weight ? BigInt(weight.toString()) : 100n
           });
         }
 
@@ -597,17 +616,30 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                             </div>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => {
-                              setListingTokenId(batch.id);
-                              setListPrice('100.00');
-                              setListingCurrency('USDC');
-                            }}
-                            className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5"
-                          >
-                            <Tag className="w-3.5 h-3.5 text-gray-600" />
-                            List for B2B Sale
-                          </button>
+                          <div className="flex gap-2 w-full">
+                            <button
+                              onClick={() => {
+                                setListingTokenId(batch.id);
+                                setListPrice('100.00');
+                                setListingCurrency('USDC');
+                              }}
+                              className="flex-grow py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5"
+                            >
+                              <Tag className="w-3.5 h-3.5 text-gray-650" />
+                              List
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setSelectedSplitBatch(batch);
+                                setSplitModalOpen(true);
+                              }}
+                              className="flex-grow py-2.5 bg-white hover:bg-gray-50 text-cyan-600 border border-cyan-200 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                              Split Batch
+                            </button>
+                          </div>
                         )
                       ) : (
                         <div className="w-full py-2 bg-gray-50 text-gray-400 border border-gray-100 rounded-xl text-[11px] text-center italic">
@@ -632,6 +664,19 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
           }}
           batch={selectedCrossChainBatch}
           onSuccess={() => setRefreshKey((prev) => prev + 1)}
+        />
+      )}
+
+      {selectedSplitBatch && (
+        <BatchSplitter
+          batch={selectedSplitBatch}
+          onClose={() => {
+            setSplitModalOpen(false);
+            setSelectedSplitBatch(null);
+          }}
+          onSuccess={() => {
+            setRefreshKey((prev) => prev + 1);
+          }}
         />
       )}
     </div>
