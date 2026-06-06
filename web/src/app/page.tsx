@@ -7,11 +7,15 @@ import TwinCreator from '@/components/TwinCreator';
 import OwnershipTransfer from '@/components/OwnershipTransfer';
 import EscrowDashboard from '@/components/EscrowDashboard';
 import AgentConsole from '@/components/AgentConsole';
+import LendingPoolConsole from '@/components/LendingPoolConsole';
+import DeveloperConsole from '@/components/DeveloperConsole';
 import { Leaf, Award, Cpu, ShieldCheck } from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 export default function OperationsDesk() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [activeTab, setActiveTab] = useState<'desk' | 'escrow' | 'agents'>('desk');
+  const [activeTab, setActiveTab] = useState<'desk' | 'escrow' | 'agents' | 'lending' | 'developer'>('desk');
+  const { address } = useAccount();
 
   const handleMintSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -87,6 +91,26 @@ export default function OperationsDesk() {
           >
             Agent Registry
           </button>
+          <button
+            onClick={() => setActiveTab('lending')}
+            className={`px-5 py-3 border-b-2 font-bold text-xs tracking-wider uppercase transition-all duration-200 ${
+              activeTab === 'lending'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-950'
+            }`}
+          >
+            Trade Credit
+          </button>
+          <button
+            onClick={() => setActiveTab('developer')}
+            className={`px-5 py-3 border-b-2 font-bold text-xs tracking-wider uppercase transition-all duration-200 ${
+              activeTab === 'developer'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-950'
+            }`}
+          >
+            Developer Console
+          </button>
         </div>
 
         {activeTab === 'desk' ? (
@@ -126,7 +150,7 @@ export default function OperationsDesk() {
             </div>
             <EscrowDashboard />
           </div>
-        ) : (
+        ) : activeTab === 'agents' ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <span className="w-1 h-4 bg-gray-900 rounded-full" />
@@ -135,6 +159,26 @@ export default function OperationsDesk() {
               </h2>
             </div>
             <AgentConsole />
+          </div>
+        ) : activeTab === 'lending' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-4 bg-gray-900 rounded-full" />
+              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                Crop Collateralized Lending Pool
+              </h2>
+            </div>
+            <LendingPoolConsole />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-4 bg-gray-900 rounded-full" />
+              <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
+                Developer Integration Portal
+              </h2>
+            </div>
+            <DeveloperConsole userAddress={address || '0x1087E71CD83101adF154d8215522EadA51Bf891E'} />
           </div>
         )}
 

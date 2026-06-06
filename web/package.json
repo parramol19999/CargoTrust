@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "telemetry:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('telemetry_db.json')) fs.writeFileSync('telemetry_db.json', '[]');\""
+    "telemetry:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('telemetry_db.json')) fs.writeFileSync('telemetry_db.json', '[]');\"",
+    "gateway:dev": "npm --prefix ../gateway run start:dev",
+    "gateway:start": "npm --prefix ../gateway run start"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "^1.11.2",
