@@ -94,7 +94,19 @@ export default function VerifierDashboard() {
             args: [BigInt(i)],
           });
 
-          const [producer, origin, harvestDate, latLong, ipfsMetadata, priceUsdc, isForSale, status] = details;
+          const [
+            producer,
+            origin,
+            harvestDate,
+            latLong,
+            ipfsMetadata,
+            priceUsdc,
+            isForSale,
+            status,
+            paymentToken,
+            isEncrypted,
+            encryptedPrice
+          ] = details;
 
           let parsedDesc = 'Batch details on-chain';
           if (ipfsMetadata.includes('?desc=')) {
@@ -112,6 +124,8 @@ export default function VerifierDashboard() {
             owner: currentOwner,
             verificationsCount: verifications.length,
             verificationsList: verifications,
+            isEncrypted: !!isEncrypted,
+            encryptedPrice: encryptedPrice || '',
           });
         }
 
@@ -448,7 +462,11 @@ export default function VerifierDashboard() {
                   <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50/30 transition-all duration-150">
                     <td className="p-3 text-gray-900 font-bold">#{batch.id}</td>
                     <td className="p-3 text-gray-800 font-bold max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
-                      {batch.origin}
+                      {batch.isEncrypted ? (
+                        <span className="text-gray-400 font-bold">Encrypted Batch 🔒</span>
+                      ) : (
+                        batch.origin
+                      )}
                     </td>
                     <td className="p-3 text-gray-500">{truncateAddress(batch.owner, 4)}</td>
                     <td className="p-3">
