@@ -310,6 +310,50 @@
       {
         "indexed": true,
         "internalType": "uint256",
+        "name": "childId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "parentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "weight",
+        "type": "uint256"
+      }
+    ],
+    "name": "CargoSplitChild",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "parentId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "childWeights",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "CargoSplitParent",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
       },
@@ -596,6 +640,21 @@
         "internalType": "address",
         "name": "paymentToken",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isEncrypted",
+        "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "encryptedPrice",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "weight",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -652,6 +711,30 @@
       {
         "internalType": "uint256",
         "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "childTokensOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -788,11 +871,45 @@
             "internalType": "address",
             "name": "paymentToken",
             "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "isEncrypted",
+            "type": "bool"
+          },
+          {
+            "internalType": "string",
+            "name": "encryptedPrice",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "weight",
+            "type": "uint256"
           }
         ],
         "internalType": "struct CargoRegistry.CargoBatch",
         "name": "",
         "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_parentId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getChildTokens",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -930,6 +1047,138 @@
         "internalType": "string",
         "name": "_ipfsMetadata",
         "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_weight",
+        "type": "uint256"
+      }
+    ],
+    "name": "mintCargo",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_origin",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_harvestDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_latLong",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_ipfsMetadata",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isEncrypted",
+        "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "_encryptedPrice",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_weight",
+        "type": "uint256"
+      }
+    ],
+    "name": "mintCargo",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_origin",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_harvestDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_latLong",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_ipfsMetadata",
+        "type": "string"
+      }
+    ],
+    "name": "mintCargo",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_origin",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_harvestDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_latLong",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_ipfsMetadata",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isEncrypted",
+        "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "_encryptedPrice",
+        "type": "string"
       }
     ],
     "name": "mintCargo",
@@ -996,6 +1245,25 @@
         "internalType": "address",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "parentTokenOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1256,6 +1524,37 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_verifierRegistry",
+        "type": "address"
+      }
+    ],
+    "name": "setVerifierRegistry",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_parentId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "_childWeights",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "splitCargo",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes",
         "name": "sig",
         "type": "bytes"
@@ -1489,6 +1788,19 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "verifierRegistry",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",

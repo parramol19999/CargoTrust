@@ -62,6 +62,21 @@ async function main() {
   fs.writeFileSync(agentAbiPath, JSON.stringify(agentAbi, null, 2));
   console.log("AgentRegistry ABI saved to:", agentAbiPath);
 
+  // Load VerifierRegistry Artifact
+  const verifierArtifactPath = path.resolve(process.cwd(), "artifacts/contracts/VerifierRegistry.sol/VerifierRegistry.json");
+  if (!fs.existsSync(verifierArtifactPath)) {
+    console.error("Error: VerifierRegistry Artifact not found. Run compile first.");
+    process.exit(1);
+  }
+  const verifierArtifact = JSON.parse(fs.readFileSync(verifierArtifactPath, "utf8"));
+  const verifierAbi = verifierArtifact.abi;
+  const verifierBytecode = verifierArtifact.bytecode;
+
+  // Save VerifierRegistry ABI for frontend
+  const verifierAbiPath = path.resolve(frontendComponentsDir, "VerifierRegistryABI.json");
+  fs.writeFileSync(verifierAbiPath, JSON.stringify(verifierAbi, null, 2));
+  console.log("VerifierRegistry ABI saved to:", verifierAbiPath);
+
   // Deploy Setup
   console.log("Connecting to Arc Testnet...");
   const provider = new ethers.JsonRpcProvider(process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.network");
@@ -119,6 +134,27 @@ async function main() {
   await linkAgentTx.wait();
   console.log("Linked AgentRegistry on-chain!");
 
+  // Deploy VerifierRegistry
+  console.log("Deploying VerifierRegistry contract...");
+  const verifierRegistryFactory = new ethers.ContractFactory(verifierAbi, verifierBytecode, wallet);
+  const verifierRegistry = await verifierRegistryFactory.deploy(usdcAddress);
+  console.log("Waiting for VerifierRegistry deployment confirmation...");
+  await verifierRegistry.waitForDeployment();
+  const verifierRegistryAddress = await verifierRegistry.getAddress();
+  console.log("VerifierRegistry deployed to:", verifierRegistryAddress);
+
+  // Link VerifierRegistry on CargoRegistry
+  console.log("Linking VerifierRegistry to CargoRegistry...");
+  const linkVerifierTx = await cargoRegistry.setVerifierRegistry(verifierRegistryAddress);
+  await linkVerifierTx.wait();
+  console.log("Linked VerifierRegistry to CargoRegistry!");
+
+  // Link CargoRegistry on VerifierRegistry
+  console.log("Linking CargoRegistry to VerifierRegistry...");
+  const linkCargoTx = await verifierRegistry.setCargoRegistry(registryAddress);
+  await linkCargoTx.wait();
+  console.log("Linked CargoRegistry to VerifierRegistry!");
+
   // Ensure frontend lib directory exists
   const frontendLibDir = path.resolve(process.cwd(), "../web/src/lib");
   if (!fs.existsSync(frontendLibDir)) {
@@ -156,6 +192,15 @@ async function main() {
     } else {
       constantsContent += `\nexport const AGENT_REGISTRY_ADDRESS = '${agentRegistryAddress}' as const;\n`;
     }
+
+    if (constantsContent.includes("VERIFIER_REGISTRY_ADDRESS")) {
+      constantsContent = constantsContent.replace(
+        /export const VERIFIER_REGISTRY_ADDRESS = '0x[a-fA-F0-9]+' as const;/,
+        `export const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;`
+      );
+    } else {
+      constantsContent += `\nexport const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;\n`;
+    }
   } else {
     constantsContent = `// ─── Arc Testnet Chain & Contract Constants ───
 export const ARC_TESTNET_CHAIN_ID = 5042002;
@@ -169,15 +214,17 @@ export const USDC_DECIMALS = 6;
 export const CARGO_REGISTRY_ADDRESS = '${registryAddress}' as const;
 export const CARGO_ESCROW_ADDRESS = '${escrowAddress}' as const;
 export const AGENT_REGISTRY_ADDRESS = '${agentRegistryAddress}' as const;
+export const VERIFIER_REGISTRY_ADDRESS = '${verifierRegistryAddress}' as const;
 `;
   }
   fs.writeFileSync(constantsPath, constantsContent);
-  console.log("Updated constants.ts with registry, escrow, and agent registry addresses.");
+  console.log("Updated constants.ts with registry, escrow, agent registry, and verifier registry addresses.");
 
   console.log("\n=== Deployment Summary ===");
   console.log("Registry Address:", registryAddress);
   console.log("Escrow Address:", escrowAddress);
   console.log("Agent Registry Address:", agentRegistryAddress);
+  console.log("Verifier Registry Address:", verifierRegistryAddress);
   console.log("Network: Arc Testnet (5042002)");
   console.log("USDC ERC20:", usdcAddress);
   console.log("Explorer: https://testnet.arcscan.app/address/" + registryAddress);
