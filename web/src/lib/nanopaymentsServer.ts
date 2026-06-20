@@ -51,13 +51,16 @@ export async function saveTelemetryLogToDb(log: TelemetryLog): Promise<boolean> 
   }
 }
 
+import { verifyMessage } from 'viem';
+
 /**
- * Server Helper: Validates payment token, prevents replays, and checks rate limits.
+ * Server Helper: Validates payment token, prevents replays, checks rate limits,
+ * and cryptographically verifies the EIP-191 personal signature from the buyer.
  */
-export function validatePaymentToken(
+export async function validatePaymentToken(
   tokenStr: string,
   ip: string
-): { success: boolean; error?: string; payload?: any } {
+): Promise<{ success: boolean; error?: string; payload?: any }> {
   try {
     if (!tokenStr) {
       return { success: false, error: 'Payment token missing.' };
@@ -66,9 +69,9 @@ export function validatePaymentToken(
     const decodedStr = Buffer.from(tokenStr, 'base64').toString('utf8');
     const payload = JSON.parse(decodedStr);
 
-    const { nonce, amount, tokenId, buyerAddress } = payload;
+    const { nonce, amount, tokenId, buyerAddress, signature } = payload;
 
-    if (!nonce || !amount || !tokenId || !buyerAddress) {
+    if (!nonce || !amount || !tokenId || !buyerAddress || !signature) {
       return { success: false, error: 'Malformed payment token.' };
     }
 
@@ -92,8 +95,21 @@ export function validatePaymentToken(
     }
     rateLimitCache.set(ip, now);
 
+    // 3. Cryptographic Signature Verification
+    const sessionNonce = nonce.split('-')[0];
+    const message = `Authorize Telemetry Stream Session for Crop Twin #${tokenId} (Session: ${sessionNonce})`;
+    const isSignatureValid = await verifyMessage({
+      address: buyerAddress as `0x${string}`,
+      message,
+      signature: signature as `0x${string}`,
+    });
+
+    if (!isSignatureValid) {
+      return { success: false, error: 'Cryptographic signature verification failed.' };
+    }
+
     return { success: true, payload };
   } catch (e) {
-    return { success: false, error: 'Invalid payment token encoding.' };
+    return { success: false, error: 'Invalid payment token encoding or signature format.' };
   }
 }

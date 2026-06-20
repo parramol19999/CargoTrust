@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Validate Payment Token (prevents replays and rate limits)
-  const validation = validatePaymentToken(paymentToken, ip);
+  const validation = await validatePaymentToken(paymentToken, ip);
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 402 });
   }

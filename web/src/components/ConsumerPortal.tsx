@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { usePublicClient, useAccount } from 'wagmi';
+import { usePublicClient, useAccount, useSignMessage } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { 
@@ -35,6 +35,9 @@ export default function ConsumerPortal() {
   const router = useRouter();
   const publicClient = usePublicClient();
   const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const [sessionSig, setSessionSig] = useState<string | null>(null);
+  const [sessionNonce, setSessionNonce] = useState<string | null>(null);
 
   const [tokenIdInput, setTokenIdInput] = useState('');
   const [activeTokenId, setActiveTokenId] = useState<number | null>(null);
@@ -75,8 +78,21 @@ export default function ConsumerPortal() {
         }
 
         try {
-          // Generate EIP-3009 micro-payment token payload
-          const token = generateClientPaymentToken('0xBuyerWalletAddressGoesHere', '0.000001', activeTokenId);
+          if (!sessionNonce || !sessionSig || !address) {
+            setIsStreaming(false);
+            setStreamError('Session expired or unauthorized. Please re-sign.');
+            return;
+          }
+          const nonceVal = `${sessionNonce}-${Date.now()}`;
+          const payload = {
+            buyerAddress: address,
+            amount: '0.000001',
+            currency: 'USDC',
+            tokenId: activeTokenId,
+            nonce: nonceVal,
+            signature: sessionSig,
+          };
+          const token = Buffer.from(JSON.stringify(payload)).toString('base64');
           
           const response = await fetch(`/api/telemetry?tokenId=${activeTokenId}`, {
             headers: {
@@ -114,7 +130,38 @@ export default function ConsumerPortal() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isStreaming, activeTokenId, escrowBalance]);
+  }, [isStreaming, activeTokenId, escrowBalance, sessionNonce, sessionSig, address]);
+
+  const handleToggleStream = async () => {
+    if (isStreaming) {
+      setIsStreaming(false);
+      return;
+    }
+    
+    if (!address) {
+      setStreamError('Please connect your owner wallet to authorize telemetry micro-payments.');
+      return;
+    }
+
+    if (activeTokenId === null) {
+      setStreamError('Please search and select a cargo token ID first.');
+      return;
+    }
+    
+    setStreamError('');
+    try {
+      const nonce = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const message = `Authorize Telemetry Stream Session for Crop Twin #${activeTokenId} (Session: ${nonce})`;
+      
+      const sig = await signMessageAsync({ message });
+      setSessionNonce(nonce);
+      setSessionSig(sig);
+      setIsStreaming(true);
+    } catch (e: any) {
+      console.error(e);
+      setStreamError(`Authorization failed: ${e.message || 'Signature rejected by wallet.'}`);
+    }
+  };
 
   // 1. Read URL params (e.g. ?tokenId=1)
   useEffect(() => {
@@ -615,9 +662,8 @@ export default function ConsumerPortal() {
                       </button>
                     </div>
 
-                    {/* Stream Toggle Button */}
                     <button
-                      onClick={() => setIsStreaming(!isStreaming)}
+                      onClick={handleToggleStream}
                       className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5 ${
                         isStreaming
                           ? 'bg-gray-900 hover:bg-gray-800 text-white'
