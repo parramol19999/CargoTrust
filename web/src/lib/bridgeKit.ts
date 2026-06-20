@@ -1,4 +1,36 @@
-import { pad } from 'viem';
+import { pad, keccak256, decodeEventLog } from 'viem';
+
+// ABI for MessageTransmitter containing MessageSent event
+const MESSAGE_TRANSMITTER_EVENTS = [
+  {
+    name: 'MessageSent',
+    type: 'event',
+    inputs: [
+      { name: 'message', type: 'bytes', indexed: false }
+    ]
+  }
+] as const;
+
+export function extractMessageFromReceipt(receipt: any): { message: `0x${string}`; messageHash: `0x${string}` } {
+  for (const log of receipt.logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: MESSAGE_TRANSMITTER_EVENTS,
+        eventName: 'MessageSent',
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded && decoded.args && decoded.args.message) {
+        const message = decoded.args.message;
+        const messageHash = keccak256(message);
+        return { message, messageHash };
+      }
+    } catch (e) {
+      // Skip log if it doesn't match
+    }
+  }
+  throw new Error('CCTP MessageSent event log not found in burn transaction receipt.');
+}
 
 // CCTP Domains
 export const CCTP_DOMAINS = {
