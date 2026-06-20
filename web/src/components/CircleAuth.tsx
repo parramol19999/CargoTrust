@@ -3,7 +3,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useConnect, useDisconnect, useAccount } from 'wagmi';
 import { getOrCreateUserSession, createWalletChallengeAction, fetchUserWalletsAction } from '@/lib/circleClient';
-import { ShieldCheck, Mail, Key, LogOut, CheckCircle2, User, ChevronRight, AlertCircle, Copy, Check } from 'lucide-react';
+import { ShieldCheck, Mail, Key, LogOut, CheckCircle2, User, ChevronRight, AlertCircle, Copy, Check, Loader2 } from 'lucide-react';
 
 interface CircleSession {
   email: string;
@@ -103,11 +103,16 @@ export function CircleAuthProvider({ children }: { children: React.ReactNode }) 
         // Execute challenge (Passkey registration)
         const { W3SSdk } = await import('@circle-fin/w3s-pw-web-sdk');
         const sdk = new W3SSdk();
+        if (process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL) {
+          (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL;
+        }
         sdk.setAppSettings({ appId: tempSession.appId });
         sdk.setAuthentication({
           userToken: tempSession.userToken,
           encryptionKey: tempSession.encryptionKey,
         });
+
+        await sdk.getDeviceId();
 
         const success = await new Promise<boolean>((resolve) => {
           sdk.execute(challengeRes.challengeId!, async (err, result) => {
@@ -198,34 +203,17 @@ export function CircleAuthProvider({ children }: { children: React.ReactNode }) 
 function CircleAuthModal() {
   const { isAuthOpen, setIsAuthOpen, login, loading, error } = useCircleAuth();
   const [email, setEmail] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpError, setOtpError] = useState<string | null>(null);
 
   if (!isAuthOpen) return null;
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes('@')) {
-      setOtpError('Please enter a valid email address');
       return;
     }
-    setOtpError(null);
-    setOtpSent(true);
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode !== '123456' && otpCode.length !== 6) {
-      setOtpError('Invalid OTP code. Use 123456 for testnet login.');
-      return;
-    }
-    setOtpError(null);
     const success = await login(email);
     if (success) {
       setIsAuthOpen(false);
-      setOtpSent(false);
-      setOtpCode('');
       setEmail('');
     }
   };
@@ -259,135 +247,81 @@ function CircleAuthModal() {
           </div>
         )}
 
-        {otpError && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-100 text-amber-600 rounded-xl flex items-start gap-2.5 text-sm">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{otpError}</span>
+
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+              Email Address
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@farm.com"
+                required
+                disabled={loading}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none text-gray-900"
+              />
+              <Mail className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-gray-400" />
+            </div>
           </div>
-        )}
 
-        {!otpSent ? (
-          <form onSubmit={handleSendOtp} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@farm.com"
-                  required
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none text-gray-900"
-                />
-                <Mail className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-gray-400" />
-              </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold tracking-wide shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Creating / Loading Passkey Wallet...</span>
+              </>
+            ) : (
+              <>
+                <span>Continue with Passkey</span>
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+
+          <div className="relative flex items-center justify-center my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-150" />
             </div>
+            <span className="relative bg-white px-3 text-xs text-gray-400 uppercase tracking-wider font-medium">
+              Demo Growers
+            </span>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold tracking-wide shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 transition-all flex items-center justify-center gap-1.5"
-            >
-              Continue with Email
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <div className="relative flex items-center justify-center my-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-100" />
-              </div>
-              <span className="relative bg-white px-3 text-xs text-gray-400 uppercase tracking-wider font-medium">
-                Or Social Auth
-              </span>
-            </div>
-
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => {
-                // Mock social login
-                setEmail('demo-grower@cargotrust.io');
-                setOtpSent(true);
+              onClick={async () => {
+                setEmail('grower1@cargotrust.io');
+                await login('grower1@cargotrust.io');
+                setIsAuthOpen(false);
               }}
               disabled={loading}
-              className="w-full py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
+              className="py-2.5 px-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 text-center"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.69c-.29 1.5-1.14 2.78-2.4 3.62v3.02h3.87c2.26-2.08 3.58-5.14 3.58-8.49z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.87-3.02c-1.08.72-2.45 1.16-4.09 1.16-3.15 0-5.81-2.13-6.76-5.01H1.36v3.12c2 3.97 6.11 6.66 10.64 6.66z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.24 14.22c-.25-.72-.39-1.5-.39-2.3 0-.8.14-1.57.39-2.3V6.5H1.36C.49 8.21 0 10.1 0 12s.49 3.79 1.36 5.5l3.88-3.28z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.47 0 3.36 2.69 1.36 6.5l3.88 3.28c.95-2.88 3.61-5.03 6.76-5.03z"
-                />
-              </svg>
-              Sign in with Google
+              Grower 1
             </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl text-xs text-amber-800 leading-relaxed">
-              <strong>Testnet Notice:</strong> A mock OTP has been sent. Please enter <strong>123456</strong> to proceed.
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                Verification Code (OTP)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
-                  required
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm tracking-widest text-center font-mono focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none text-gray-900"
-                />
-                <Key className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-gray-400" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-sm font-semibold tracking-wide shadow-lg shadow-cyan-600/10 hover:shadow-cyan-600/20 transition-all flex items-center justify-center gap-1.5"
-            >
-              {loading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creating Secure Passkey...
-                </>
-              ) : (
-                <>
-                  Verify & Register Passkey
-                  <ChevronRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-
             <button
               type="button"
-              onClick={() => setOtpSent(false)}
+              onClick={async () => {
+                setEmail('grower2@cargotrust.io');
+                await login('grower2@cargotrust.io');
+                setIsAuthOpen(false);
+              }}
               disabled={loading}
-              className="w-full text-center text-xs text-gray-500 hover:text-gray-800 transition-colors py-1"
+              className="py-2.5 px-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 text-center"
             >
-              Back to Email
+              Grower 2
             </button>
-          </form>
-        )}
+          </div>
+        </form>
       </div>
     </div>
   );
