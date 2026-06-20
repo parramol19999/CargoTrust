@@ -17,7 +17,15 @@ import {
 } from 'lucide-react';
 import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
-import { SUPPORTED_SOURCE_CHAINS, TOKEN_MESSENGER_ABI, addressToBytes32, CCTP_DOMAINS } from '@/lib/bridgeKit';
+import { 
+  SUPPORTED_SOURCE_CHAINS, 
+  TOKEN_MESSENGER_ABI, 
+  MESSAGE_TRANSMITTER_ABI,
+  addressToBytes32, 
+  CCTP_DOMAINS,
+  extractMessageFromReceipt,
+  getCCTPAttestation
+} from '@/lib/bridgeKit';
 
 interface CrossChainPurchaseModalProps {
   isOpen: boolean;
@@ -53,7 +61,6 @@ export default function CrossChainPurchaseModal({
 
   // Selected source chain
   const [selectedChainKey, setSelectedChainKey] = useState<string>('base-sepolia');
-  const [isSimulated, setIsSimulated] = useState<boolean>(true);
   
   // Transaction processing states
   const [isBridging, setIsBridging] = useState<boolean>(false);
@@ -113,141 +120,101 @@ export default function CrossChainPurchaseModal({
     setIsBridging(true);
 
     try {
-      if (isSimulated) {
-        // ─── SIMULATION MODE (Matches all testing scenarios perfectly) ───
-        
-        // 1. Approval
-        setCurrentStepIdx(0);
-        updateStepStatus(0, 'processing');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setTxHashes(prev => ({ ...prev, approve: '0xmockapprove83819a8d7cb1829e018a38c829e01bcf92749a' }));
-        updateStepStatus(0, 'success');
+      // ─── REAL CCTP FLOW ───
 
-        // 2. Burn (CCTP)
-        setCurrentStepIdx(1);
-        updateStepStatus(1, 'processing');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setTxHashes(prev => ({ ...prev, burn: '0xmockburncctp28491bb7dce819a0a82bce829ea928e01ff' }));
-        updateStepStatus(1, 'success');
-
-        // 3. Attestation Polling
-        setCurrentStepIdx(2);
-        updateStepStatus(2, 'processing');
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        updateStepStatus(2, 'success');
-
-        // 4. Settle on Arc (Mint + Purchase)
-        setCurrentStepIdx(3);
-        updateStepStatus(3, 'processing');
-        
-        // Switch user wallet back to Arc Testnet if needed
-        if (chainId !== 5042002 && switchChainAsync) {
-          try {
-            await switchChainAsync({ chainId: 5042002 });
-          } catch (e) {
-            console.warn('Network switch declined; executing on active chain context');
-          }
-        }
-
-        // Execute actual purchase contract call on Arc Testnet
-        const purchaseTx = await writeContractAsync({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'purchaseCargo',
-          args: [BigInt(batch.id)],
-        });
-
-        setTxHashes(prev => ({ ...prev, purchase: purchaseTx }));
-        
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash: purchaseTx });
-        }
-
-        updateStepStatus(3, 'success');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        onSuccess();
-        onClose();
-
-      } else {
-        // ─── REAL CCTP FLOW ───
-
-        // Switch to source chain if chainId differs
-        if (chainId !== selectedChain.chainId && switchChainAsync) {
-          await switchChainAsync({ chainId: selectedChain.chainId });
-        }
-
-        // Step 1: Approve
-        setCurrentStepIdx(0);
-        updateStepStatus(0, 'processing');
-        
-        const approveTx = await writeContractAsync({
-          address: selectedChain.usdcAddress,
-          abi: USDC_ABI,
-          functionName: 'approve',
-          args: [selectedChain.tokenMessengerAddress, batch.priceUsdc],
-        });
-        setTxHashes(prev => ({ ...prev, approve: approveTx }));
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash: approveTx });
-        }
-        updateStepStatus(0, 'success');
-
-        // Step 2: Burn
-        setCurrentStepIdx(1);
-        updateStepStatus(1, 'processing');
-        
-        const recipientBytes32 = addressToBytes32(address);
-        
-        const burnTx = await writeContractAsync({
-          address: selectedChain.tokenMessengerAddress,
-          abi: TOKEN_MESSENGER_ABI,
-          functionName: 'depositForBurn',
-          args: [batch.priceUsdc, CCTP_DOMAINS.Arc, recipientBytes32, selectedChain.usdcAddress],
-        });
-        setTxHashes(prev => ({ ...prev, burn: burnTx }));
-        
-        let receipt;
-        if (publicClient) {
-          receipt = await publicClient.waitForTransactionReceipt({ hash: burnTx });
-        }
-        updateStepStatus(1, 'success');
-
-        // Step 3: Attestation Polling
-        setCurrentStepIdx(2);
-        updateStepStatus(2, 'processing');
-        
-        // Compute messageHash from emitted logs (or fall back to mock polling)
-        await new Promise(resolve => setTimeout(resolve, 8000));
-        updateStepStatus(2, 'success');
-
-        // Step 4: Settle on Arc
-        setCurrentStepIdx(3);
-        updateStepStatus(3, 'processing');
-        
-        // Switch to Arc Testnet
-        if (switchChainAsync) {
-          await switchChainAsync({ chainId: 5042002 });
-        }
-
-        // Execute purchaseCargo
-        const purchaseTx = await writeContractAsync({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'purchaseCargo',
-          args: [BigInt(batch.id)],
-        });
-
-        setTxHashes(prev => ({ ...prev, purchase: purchaseTx }));
-        
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash: purchaseTx });
-        }
-        updateStepStatus(3, 'success');
-        
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        onSuccess();
-        onClose();
+      // Switch to source chain if chainId differs
+      if (chainId !== selectedChain.chainId && switchChainAsync) {
+        await switchChainAsync({ chainId: selectedChain.chainId });
       }
+
+      // Step 1: Approve
+      setCurrentStepIdx(0);
+      updateStepStatus(0, 'processing');
+      
+      const approveTx = await writeContractAsync({
+        address: selectedChain.usdcAddress,
+        abi: USDC_ABI,
+        functionName: 'approve',
+        args: [selectedChain.tokenMessengerAddress, batch.priceUsdc],
+      });
+      setTxHashes(prev => ({ ...prev, approve: approveTx }));
+      
+      let approveReceipt;
+      if (publicClient) {
+        approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTx });
+      }
+      updateStepStatus(0, 'success');
+
+      // Step 2: Burn
+      setCurrentStepIdx(1);
+      updateStepStatus(1, 'processing');
+      
+      const recipientBytes32 = addressToBytes32(address);
+      
+      const burnTx = await writeContractAsync({
+        address: selectedChain.tokenMessengerAddress,
+        abi: TOKEN_MESSENGER_ABI,
+        functionName: 'depositForBurn',
+        args: [batch.priceUsdc, CCTP_DOMAINS.ArcTestnet, recipientBytes32, selectedChain.usdcAddress],
+      });
+      setTxHashes(prev => ({ ...prev, burn: burnTx }));
+      
+      let burnReceipt;
+      if (publicClient) {
+        burnReceipt = await publicClient.waitForTransactionReceipt({ hash: burnTx });
+      }
+      
+      const { message, messageHash } = extractMessageFromReceipt(burnReceipt);
+      updateStepStatus(1, 'success');
+
+      // Step 3: Attestation Polling
+      setCurrentStepIdx(2);
+      updateStepStatus(2, 'processing');
+      
+      const attestation = await getCCTPAttestation(messageHash);
+      updateStepStatus(2, 'success');
+
+      // Step 4: Settle on Arc
+      setCurrentStepIdx(3);
+      updateStepStatus(3, 'processing');
+      
+      // Switch to Arc Testnet
+      if (switchChainAsync) {
+        await switchChainAsync({ chainId: 5042002 });
+      }
+
+      // Submit receiveMessage to MessageTransmitter on Arc Testnet to mint the bridged USDC
+      const messageTransmitterAddress = '0xe737e5cebeeba77efe34d4aa090756590b1ce275';
+      const mintTx = await writeContractAsync({
+        address: messageTransmitterAddress,
+        abi: MESSAGE_TRANSMITTER_ABI,
+        functionName: 'receiveMessage',
+        args: [message, attestation as `0x${string}`],
+      });
+      setTxHashes(prev => ({ ...prev, mint: mintTx }));
+      
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: mintTx });
+      }
+
+      // Execute purchaseCargo
+      const purchaseTx = await writeContractAsync({
+        address: CARGO_REGISTRY_ADDRESS,
+        abi: CARGO_REGISTRY_ABI,
+        functionName: 'purchaseCargo',
+        args: [BigInt(batch.id)],
+      });
+
+      setTxHashes(prev => ({ ...prev, purchase: purchaseTx }));
+      
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash: purchaseTx });
+      }
+      updateStepStatus(3, 'success');
+      
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      onSuccess();
+      onClose();
 
     } catch (err: any) {
       console.error(err);
@@ -317,22 +284,7 @@ export default function CrossChainPurchaseModal({
                 </div>
               </div>
 
-              {/* Simulation Mode Toggle */}
-              <div className="p-3 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-gray-900 block">Simulation Mode</span>
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">Simulate Sepolia burn to skip testnet gas requirements</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={isSimulated}
-                    onChange={(e) => setIsSimulated(e.target.checked)}
-                    className="sr-only peer" 
-                  />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                </label>
-              </div>
+
 
               {/* Alert Info */}
               <div className="p-4 bg-blue-50/50 border border-blue-150 rounded-2xl flex gap-3 text-xs text-blue-700 leading-normal">

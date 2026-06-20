@@ -119,11 +119,16 @@ export function circleUcwConnector() {
             const challengeId = res.challengeId;
             const { W3SSdk } = await import('@circle-fin/w3s-pw-web-sdk');
             const sdk = new W3SSdk();
+            if (process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL) {
+              (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL;
+            }
             sdk.setAppSettings({ appId: session.appId });
             sdk.setAuthentication({
               userToken: session.userToken,
               encryptionKey: session.encryptionKey,
             });
+
+            await sdk.getDeviceId();
 
             return new Promise<string>((resolve, reject) => {
               sdk.execute(challengeId, async (error, result) => {
@@ -178,12 +183,17 @@ export function circleUcwConnector() {
   } as any));
 }
 
+import { sepolia, baseSepolia, arbitrumSepolia } from 'viem/chains';
+
 const config = getDefaultConfig({
   appName: 'CargoTrust Platform',
   projectId: '4c311a3b827e8a93a8d6e3c0800b4cef52',
-  chains: [arcTestnet],
+  chains: [arcTestnet, baseSepolia, sepolia, arbitrumSepolia],
   transports: {
     [arcTestnet.id]: http(),
+    [baseSepolia.id]: http(),
+    [sepolia.id]: http(),
+    [arbitrumSepolia.id]: http(),
   },
   ssr: true,
 });
