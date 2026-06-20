@@ -1,7 +1,11 @@
 import { ethers } from 'ethers';
 import { USDC_ADDRESS, EURC_ADDRESS } from './constants';
 
-const SIGNER_PRIVATE_KEY = process.env.STABLEFX_SIGNER_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+let signerKey = process.env.STABLEFX_SIGNER_KEY || process.env.PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+if (signerKey && !signerKey.startsWith('0x')) {
+  signerKey = '0x' + signerKey;
+}
+const SIGNER_PRIVATE_KEY = signerKey;
 
 export interface StableFXQuote {
   tokenId: number;
