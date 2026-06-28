@@ -3,7 +3,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useConnect, useDisconnect, useAccount } from 'wagmi';
 import { getOrCreateUserSession, createWalletChallengeAction, fetchUserWalletsAction } from '@/lib/circleClient';
-import { ShieldCheck, Mail, Key, LogOut, CheckCircle2, User, ChevronRight, AlertCircle, Copy, Check, Loader2 } from 'lucide-react';
+import { ShieldCheck, Mail, Key, LogOut, CheckCircle2, User, ChevronRight, AlertCircle, Copy, Check, Loader2, HelpCircle } from 'lucide-react';
 
 interface CircleSession {
   email: string;
@@ -103,8 +103,8 @@ export function CircleAuthProvider({ children }: { children: React.ReactNode }) 
         // Execute challenge (Passkey registration)
         const { W3SSdk } = await import('@circle-fin/w3s-pw-web-sdk');
         const sdk = new W3SSdk();
-        if (process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL) {
-          (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL;
+        if (process.env.NEXT_PUBLIC_CIRCLE_SERVICE_URL) {
+          (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_SERVICE_URL;
         }
         sdk.setAppSettings({ appId: tempSession.appId });
         sdk.setAuthentication({
@@ -251,15 +251,23 @@ function CircleAuthModal() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-              Email Address
-            </label>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Email Address
+              </label>
+              <div className="group relative inline-block">
+                <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                  Enter your email address to register or retrieve your secure passkey-protected wallet.
+                </div>
+              </div>
+            </div>
             <div className="relative">
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@farm.com"
+                placeholder="E.g., grower@cargotrust.io"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all outline-none text-gray-900"

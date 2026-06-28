@@ -74,10 +74,28 @@ export async function getOrCreateUserSession(email: string) {
 
 export async function createWalletChallengeAction(userToken: string) {
   try {
-    const response = await client.createWallet({
-      userToken,
-      blockchains: ["ARC-TESTNET"],
-    });
+    let pinStatus = "UNSET";
+    try {
+      const userStatus = await client.getUserStatus({ userToken });
+      pinStatus = userStatus.data?.pinStatus || "UNSET";
+    } catch (err) {
+      console.log("Could not query user status, defaulting to UNSET PIN:", err);
+    }
+
+    let response;
+    if (pinStatus === "UNSET") {
+      response = await client.createUserPinWithWallets({
+        userToken,
+        blockchains: ["ARC-TESTNET"],
+        accountType: "SCA",
+      });
+    } else {
+      response = await client.createWallet({
+        userToken,
+        blockchains: ["ARC-TESTNET"],
+        accountType: "SCA",
+      });
+    }
     
     return {
       success: true,
