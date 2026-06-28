@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useModal } from '@/lib/modals/store';
+import { mapRawError } from '@/lib/modals/errorMapper';
 import { useAccount } from 'wagmi';
-import { Lock, Unlock, Key, Check, X, RefreshCw, Loader2, Send } from 'lucide-react';
+import { Lock, Unlock, Key, Check, X, RefreshCw, Loader2, Send, HelpCircle } from 'lucide-react';
 import { decryptKeyWithECDH } from '@/lib/cryptoHelper';
 
 interface AccessRequest {
@@ -17,6 +19,7 @@ interface AccessRequest {
 }
 
 export default function AccessRequestPanel({ refreshTrigger }: { refreshTrigger?: number }) {
+  const { openModal } = useModal();
   const { address, isConnected } = useAccount();
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -143,7 +146,6 @@ export default function AccessRequestPanel({ refreshTrigger }: { refreshTrigger?
     if (!address) return;
     setActionLoadingId(req.id);
     try {
-      // Get requester private key
       const keyRes = await fetch(`/api/privacy/keys?address=${address}`);
       const keyData = await keyRes.json();
       if (!keyData.success) throw new Error('Could not fetch ECDH keys');
@@ -154,19 +156,32 @@ export default function AccessRequestPanel({ refreshTrigger }: { refreshTrigger?
         throw new Error('Owner public key or encrypted key is missing');
       }
 
-      // Decrypt AES key using ECDH shared secret
       const decryptedAesKey = decryptKeyWithECDH(
         req.ownerPublicKey,
         requesterPrivateKey,
         req.encryptedKey
       );
 
-      // Save decrypted key in localStorage so portals can decrypt batch data
       localStorage.setItem(`crop_key_${req.tokenId}`, decryptedAesKey);
-      alert(`Successfully decrypted crop key for batch #${req.tokenId}! Shared secret derived via secp256k1 ECDH.`);
+
+      openModal({
+        id: 'decrypt-success-' + req.id,
+        type: 'success',
+        title: 'Decryption Completed',
+        description: `Successfully decrypted the crop key for batch #${req.tokenId}. Shared secret derived via secp256k1 ECDH. You can now access protected metadata fields.`,
+      });
+
       fetchRequests();
     } catch (err: any) {
-      alert(`Decryption failed: ${err.message}`);
+      console.error(err);
+      const mapped = mapRawError(err);
+      openModal({
+        id: 'decrypt-error-' + req.id,
+        type: 'error',
+        title: 'Decryption Failed',
+        description: mapped.description,
+        technicalDetails: mapped.technicalDetails,
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -200,15 +215,23 @@ export default function AccessRequestPanel({ refreshTrigger }: { refreshTrigger?
 
           <form onSubmit={handleRequestAccess} className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                Crop Token ID
-              </label>
+              <div className="flex items-center gap-1.5 mb-1">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Crop Token ID
+                </label>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-650 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                    Enter the unique numeric token ID of the crop twin you wish to decrypt.
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 required
                 value={tokenIdInput}
                 onChange={(e) => setTokenIdInput(e.target.value)}
-                placeholder="E.g., 1, 2, 3"
+                placeholder="E.g., 1"
                 className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-300"
               />
             </div>

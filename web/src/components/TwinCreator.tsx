@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
-import { Leaf, MapPin, Calendar, Compass, FileText, Loader2, ArrowRight, ArrowLeftRight } from 'lucide-react';
+import { Leaf, MapPin, Calendar, Compass, FileText, Loader2, ArrowRight, ArrowLeftRight, HelpCircle } from 'lucide-react';
 import { formatUnits } from 'viem';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
@@ -284,17 +284,24 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           {/* Main Booking-style Dual Cards (FROM / TO) */}
           <div className="relative grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Origin Farm */}
-            <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-gray-400" />
-                FROM (Origin Farm)
-              </span>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-gray-400" />
+                  FROM (Origin Farm)
+                </span>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                    Enter the name and geographic coordinates of the origin farm where the crop was harvested.
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 required
                 value={origin}
                 onChange={(e) => setOrigin(e.target.value)}
-                placeholder="E.g., Bordeaux Vineyard, France"
+                placeholder="E.g., Dalat Organic Coffee Farm, Lam Dong"
                 className="w-full bg-transparent text-base font-bold text-gray-900 focus:outline-none placeholder-gray-300"
               />
               <input
@@ -302,10 +309,9 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
                 required
                 value={latLong}
                 onChange={(e) => setLatLong(e.target.value)}
-                placeholder="Coordinates: Lat, Long"
+                placeholder="Coordinates: Lat, Long (e.g., 11.9404, 108.4583)"
                 className="w-full bg-transparent text-xs text-gray-500 font-mono mt-1 focus:outline-none placeholder-gray-400"
               />
-            </div>
 
             {/* Interactive Swapper */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 hidden md:block">
@@ -319,17 +325,24 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
             </div>
 
             {/* Destination Lab */}
-            <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <Compass className="w-3 h-3 text-gray-400" />
-                TO (QA Lab Destination)
-              </span>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <Compass className="w-3 h-3 text-gray-400" />
+                  TO (QA Lab Destination)
+                </span>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                    Enter the name and geographic coordinates of the quality testing lab or destination warehouse.
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 required
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                placeholder="Destination Warehouse / testing laboratory"
+                placeholder="E.g., CargoTrust QA Testing Lab, HCMC"
                 className="w-full bg-transparent text-base font-bold text-gray-900 focus:outline-none placeholder-gray-300"
               />
               <input
@@ -337,39 +350,54 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
                 required
                 value={destLatLong}
                 onChange={(e) => setDestLatLong(e.target.value)}
-                placeholder="Coordinates: Lat, Long"
+                placeholder="Coordinates: Lat, Long (e.g., 10.8231, 106.6297)"
                 className="w-full bg-transparent text-xs text-gray-500 font-mono mt-1 focus:outline-none placeholder-gray-400"
               />
-            </div>
           </div>
 
           {/* Date, Certs, and Description Rows */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-gray-400" />
-                Date of Harvest
-              </span>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-gray-400" />
+                  Date of Harvest
+                </span>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                    Select the exact date the crop batch was harvested.
+                  </div>
+                </div>
+              </div>
               <input
                 type="date"
                 required
                 value={harvestDate}
                 onChange={(e) => setHarvestDate(e.target.value)}
-                className="w-full bg-transparent text-base font-bold text-gray-900 focus:outline-none"
+                className="w-full bg-transparent text-base font-bold text-gray-900 focus:outline-none cursor-pointer"
               />
             </div>
 
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <FileText className="w-3 h-3 text-gray-400" />
-                Certificates URI (IPFS)
-              </span>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-gray-400" />
+                  Certificates URI (IPFS)
+                </span>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                    Enter the IPFS URI pointing to relevant lab and agricultural documents.
+                  </div>
+                </div>
+              </div>
               <input
                 type="text"
                 required
                 value={ipfsDoc}
                 onChange={(e) => setIpfsDoc(e.target.value)}
-                placeholder="ipfs://..."
+                placeholder="E.g., ipfs://QmZ4831j1n38..."
                 className="w-full bg-transparent text-sm font-bold text-gray-900 font-mono focus:outline-none placeholder-gray-300"
               />
             </div>
@@ -377,15 +405,23 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
 
           {/* Crop Grade Description */}
           <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-              Crop Batch Description & Grade Specifications
-            </span>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Crop Batch Description & Grade Specifications
+              </span>
+              <div className="group relative inline-block">
+                <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                  Describe key physical traits like batch weight, moisture content, variety classification, etc.
+                </div>
+              </div>
+            </div>
             <textarea
               rows={2}
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Provide crop weight, grade, variety, moisture level..."
+              placeholder="E.g., Premium Organic Arabica Beans, Micro-lot harvest #408"
               className="w-full bg-transparent text-sm font-semibold text-gray-900 focus:outline-none placeholder-gray-400"
             />
           </div>
@@ -415,9 +451,17 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
             {isEncrypted && (
               <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Private Target Price (USDC / EURC Value)
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Private Target Price (USDC / EURC Value)
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                        Optional encrypted price target for trade routing.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     value={targetPrice}

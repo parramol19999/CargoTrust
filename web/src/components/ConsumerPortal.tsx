@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useModal } from '@/lib/modals/store';
+import { mapRawError } from '@/lib/modals/errorMapper';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { usePublicClient, useAccount, useSignMessage } from 'wagmi';
+import { usePublicClient, useAccount, useSignMessage, useWriteContract } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { 
@@ -21,7 +23,8 @@ import {
   Plus,
   Unlock,
   Wifi,
-  CreditCard
+  CreditCard,
+  HelpCircle
 } from 'lucide-react';
 import { formatUnits } from 'viem';
 import { generateClientPaymentToken, TelemetryLog } from '@/lib/nanopayments';
@@ -31,16 +34,23 @@ import LineageTree from '@/components/LineageTree';
 import ProvenanceMap from '@/components/ProvenanceMap';
 
 export default function ConsumerPortal() {
+  const { openModal } = useModal();
   const searchParams = useSearchParams();
   const router = useRouter();
   const publicClient = usePublicClient();
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const { writeContractAsync } = useWriteContract();
+  
   const [sessionSig, setSessionSig] = useState<string | null>(null);
   const [sessionNonce, setSessionNonce] = useState<string | null>(null);
 
   const [tokenIdInput, setTokenIdInput] = useState('');
   const [activeTokenId, setActiveTokenId] = useState<number | null>(null);
+
+  // Anomaly Simulation & Spoilage states
+  const [tempSpikeSimulated, setTempSpikeSimulated] = useState(false);
+  const [spoilageLoading, setSpoilageLoading] = useState(false);
 
   // Provenance State
   const [loading, setLoading] = useState(false);
@@ -110,7 +120,17 @@ export default function ConsumerPortal() {
           if (response.ok) {
             const data = await response.json();
             if (data.success) {
-              setTelemetryLogs(data.history || []);
+              let logs = data.history || [];
+              if (tempSpikeSimulated) {
+                // If temp spike is simulated, override the last log's temperature to trigger breach alert
+                logs = logs.map((log: any, idx: number) => {
+                  if (idx === logs.length - 1) {
+                    return { ...log, temperature: 28.5 };
+                  }
+                  return log;
+                });
+              }
+              setTelemetryLogs(logs);
               // Settle off-chain balance in local state
               setEscrowBalance(prev => Math.max(0, prev - 0.000001));
               setUsdcSpent(prev => prev + 0.000001);
@@ -130,7 +150,7 @@ export default function ConsumerPortal() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isStreaming, activeTokenId, escrowBalance, sessionNonce, sessionSig, address]);
+  }, [isStreaming, activeTokenId, escrowBalance, sessionNonce, sessionSig, address, tempSpikeSimulated]);
 
   const handleToggleStream = async () => {
     if (isStreaming) {
@@ -160,6 +180,79 @@ export default function ConsumerPortal() {
     } catch (e: any) {
       console.error(e);
       setStreamError(`Authorization failed: ${e.message || 'Signature rejected by wallet.'}`);
+    }
+  };
+
+  const handleReportSpoilage = async () => {
+    if (activeTokenId === null || !address) {
+      openModal({
+        id: 'report-spoilage-no-wallet',
+        type: 'error',
+        title: 'Wallet Disconnected',
+        description: 'Please connect your Web3 wallet first to submit on-chain logs.',
+      });
+      return;
+    }
+    
+    openModal({
+      id: 'report-spoilage-tx',
+      type: 'transaction',
+      stepStatus: 'preparing',
+      statusMessage: 'Preparing the transaction to flag this cargo as Spoiled...',
+    });
+
+    setSpoilageLoading(true);
+    try {
+      openModal({
+        id: 'report-spoilage-tx',
+        type: 'transaction',
+        stepStatus: 'signing',
+        statusMessage: 'Awaiting signature in your wallet...',
+      });
+
+      const tx = await writeContractAsync({
+        address: CARGO_REGISTRY_ADDRESS,
+        abi: CARGO_REGISTRY_ABI,
+        functionName: 'updateStatus',
+        args: [BigInt(activeTokenId), 'Spoiled'],
+      });
+
+      openModal({
+        id: 'report-spoilage-tx',
+        type: 'transaction',
+        txHash: tx,
+        stepStatus: 'pending',
+        statusMessage: 'Waiting for blockchain block confirmation...',
+        explorerUrl: 'https://testnet.arcscan.app',
+      });
+
+      // Set to success once receipt triggers, but wait 4 seconds mock since we refresh privacy trigger anyway
+      setTimeout(() => {
+        openModal({
+          id: 'report-spoilage-tx',
+          type: 'transaction',
+          txHash: tx,
+          stepStatus: 'success',
+          statusMessage: `Cargo #${activeTokenId} successfully reported as Spoiled on-chain!`,
+          explorerUrl: 'https://testnet.arcscan.app',
+        });
+        setRefreshPrivacyTrigger(prev => prev + 1);
+      }, 4000);
+
+    } catch (err: any) {
+      console.error(err);
+      const mapped = mapRawError(err);
+      openModal({
+        id: 'report-spoilage-error',
+        type: 'error',
+        title: mapped.title,
+        description: mapped.description,
+        technicalDetails: mapped.technicalDetails,
+        retryLabel: mapped.retryable ? 'Try Again' : undefined,
+        onRetry: mapped.retryable ? handleReportSpoilage : undefined,
+      });
+    } finally {
+      setSpoilageLoading(false);
     }
   };
 
@@ -231,6 +324,26 @@ export default function ConsumerPortal() {
           args: [BigInt(activeTokenId)],
         }).catch(() => []);
 
+        // Read real-time cargo status from smart contract to override indexer delay
+        const onChainCargo: any = await publicClient.readContract({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'cargoBatches',
+          args: [BigInt(activeTokenId)],
+        }).catch(() => null);
+
+        const onChainOwner: any = await publicClient.readContract({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'ownerOf',
+          args: [BigInt(activeTokenId)],
+        }).catch(() => null);
+
+        let realTimeStatus = twin.status;
+        if (onChainCargo) {
+          realTimeStatus = onChainCargo[7]; // status is index 7
+        }
+
         let parsedDesc = 'Batch details on-chain';
         if (twin.ipfsMetadata.includes('?desc=')) {
           parsedDesc = decodeURIComponent(twin.ipfsMetadata.split('?desc=')[1]);
@@ -246,14 +359,14 @@ export default function ConsumerPortal() {
           description: parsedDesc,
           priceUsdc: BigInt(twin.priceUsdc || '0'),
           isForSale: twin.isForSale,
-          status: twin.status,
+          status: realTimeStatus,
           isEncrypted: !!twin.isEncrypted,
           encryptedPrice: twin.encryptedPrice || '',
           weight: BigInt(twin.weight || 100)
         };
 
         setCargo(cargoRecord);
-        setOwner(twin.owner);
+        setOwner(onChainOwner || twin.owner);
         setVerifications(verifs);
 
         // Attempt decryption automatically if a key is stored locally for this token
@@ -355,15 +468,18 @@ export default function ConsumerPortal() {
         </p>
 
         <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
-          <div className="flex-grow p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center gap-3">
-            <Search className="w-5 h-5 text-gray-400" />
+          <div className="flex-grow p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center gap-3 relative group">
+            <Search className="w-5 h-5 text-gray-400 font-bold" />
             <input
               type="text"
               value={tokenIdInput}
               onChange={(e) => setTokenIdInput(e.target.value)}
-              placeholder="E.g., enter '1' for first batch..."
+              placeholder="E.g., 1 (Enter Crop Token ID)"
               className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none placeholder-gray-300"
             />
+            <div className="group-hover:opacity-100 opacity-0 pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-[10px] rounded p-2 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center max-w-[200px]">
+              Search by entering the numeric Token ID of the crop twin registered on CargoTrust.
+            </div>
           </div>
 
           <button
@@ -648,6 +764,17 @@ export default function ConsumerPortal() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+                    {/* Anomaly Simulator */}
+                    <label className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-150 rounded-xl text-xs font-bold text-gray-700 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={tempSpikeSimulated} 
+                        onChange={(e) => setTempSpikeSimulated(e.target.checked)}
+                        className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer w-3.5 h-3.5" 
+                      />
+                      <span>Simulate Temp Spike</span>
+                    </label>
+
                     {/* Fund Escrow */}
                     <div className="px-3 py-1.5 bg-white border border-gray-150 rounded-xl flex items-center gap-2 text-xs font-mono font-bold text-gray-700">
                       <span>Escrow: ${escrowBalance.toFixed(6)} USDC</span>
@@ -695,7 +822,9 @@ export default function ConsumerPortal() {
                 <TelemetryChart 
                   logs={telemetryLogs} 
                   usdcSpent={usdcSpent} 
-                  escrowBalance={escrowBalance} 
+                  escrowBalance={escrowBalance}
+                  onTriggerSpoilage={handleReportSpoilage}
+                  isSpoilageLoading={spoilageLoading} 
                 />
 
               </div>

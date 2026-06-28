@@ -2,15 +2,23 @@
 
 import React from 'react';
 import { TelemetryLog } from '@/lib/nanopayments';
-import { Thermometer, MapPin, ShieldAlert, Cpu, Sparkles, Activity } from 'lucide-react';
+import { Thermometer, MapPin, ShieldAlert, Cpu, Sparkles, Activity, Loader2 } from 'lucide-react';
 
 interface TelemetryChartProps {
   logs: TelemetryLog[];
   usdcSpent: number;
   escrowBalance: number;
+  onTriggerSpoilage?: () => Promise<void>;
+  isSpoilageLoading?: boolean;
 }
 
-export default function TelemetryChart({ logs, usdcSpent, escrowBalance }: TelemetryChartProps) {
+export default function TelemetryChart({ 
+  logs, 
+  usdcSpent, 
+  escrowBalance,
+  onTriggerSpoilage,
+  isSpoilageLoading
+}: TelemetryChartProps) {
   const latestLog = logs[logs.length - 1];
 
   // Helper for thermometer heights & colors
@@ -83,6 +91,37 @@ export default function TelemetryChart({ logs, usdcSpent, escrowBalance }: Telem
   return (
     <div className="bg-white border border-gray-150 rounded-3xl p-6 space-y-6">
       
+      {/* ⚠️ Temperature Violation Hazard Banner */}
+      {latestLog && latestLog.temperature > 8.0 && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-red-950 text-xs block">⚠️ Cold Chain Temperature Breach Detected!</span>
+              <p className="text-[11px] text-red-700 leading-relaxed mt-1">
+                The current sensor temperature is {latestLog.temperature}°C, exceeding the safe limit (8.0°C) for agricultural produce. 
+                Spoilage risk is critical. Action is recommended to report damage.
+              </p>
+            </div>
+          </div>
+          {onTriggerSpoilage && (
+            <button
+              type="button"
+              onClick={onTriggerSpoilage}
+              disabled={isSpoilageLoading}
+              className="px-4 py-2.5 bg-red-650 hover:bg-red-750 disabled:opacity-50 text-white font-bold text-[10px] uppercase tracking-wider rounded-xl shadow shrink-0 flex items-center gap-1.5 transition-all self-end md:self-center"
+            >
+              {isSpoilageLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ShieldAlert className="w-3.5 h-3.5" />
+              )}
+              Report Cargo Spoiled
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         

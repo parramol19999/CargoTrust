@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
-import { Award, BadgeCheck, FileText, CheckSquare, Loader2, RefreshCw, PenTool } from 'lucide-react';
+import { Award, BadgeCheck, FileText, CheckSquare, Loader2, RefreshCw, PenTool, HelpCircle } from 'lucide-react';
 import { useWalletClient } from 'wagmi';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
@@ -333,11 +333,19 @@ export default function VerifierDashboard() {
             <form onSubmit={handleCertify} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Credential Badging</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Credential Badging</label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                        Select the W3C Verifiable Credential standard to certify the crop batch.
+                      </div>
+                    </div>
+                  </div>
                   <select
                     value={credType}
                     onChange={(e) => setCredType(e.target.value)}
-                    className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none cursor-pointer"
                   >
                     <option value="Organic Certified">Certified Organic (USDA/EU)</option>
                     <option value="ISO9001 Quality Grade">ISO 9001 Food Quality</option>
@@ -347,10 +355,19 @@ export default function VerifierDashboard() {
                 </div>
 
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Quality Score / Benchmarks</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Quality Score / Benchmarks</label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                        Enter the testing quality score or grade. Example format: 98/100, Grade A, or 8.5 pH.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
+                    placeholder="E.g., 98/100"
                     value={labScore}
                     onChange={(e) => setLabScore(e.target.value)}
                     className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none"
@@ -360,18 +377,34 @@ export default function VerifierDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Verification Expiry Date</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Verification Expiry Date</label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                        Select the expiration date for this quality verification.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="date"
                     required
                     value={expiryDate}
                     onChange={(e) => setExpiryDate(e.target.value)}
-                    className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none cursor-pointer"
                   />
                 </div>
 
                 <div className="p-3 bg-gray-100 border border-gray-200 rounded-xl">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Accredited Testing Laboratory</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Accredited Testing Laboratory</label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                        On-chain registered laboratory identity executing this digital twin verification.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     disabled
@@ -382,10 +415,19 @@ export default function VerifierDashboard() {
               </div>
 
               <div className="p-3 bg-white border border-gray-100 rounded-xl">
-                <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Scientific Analysis Notes</label>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <label className="block text-[10px] text-gray-400 font-bold uppercase">Scientific Analysis Notes</label>
+                  <div className="group relative inline-block">
+                    <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                      Provide scientific notes. Specify methodologies (e.g., LC-MS), pesticide trace checks, and moisture readings.
+                    </div>
+                  </div>
+                </div>
                 <textarea
                   rows={2}
                   required
+                  placeholder="E.g., Certified organic. Zero chemical pesticide detected."
                   value={testingNotes}
                   onChange={(e) => setTestingNotes(e.target.value)}
                   className="w-full bg-transparent text-xs font-bold text-gray-900 focus:outline-none"

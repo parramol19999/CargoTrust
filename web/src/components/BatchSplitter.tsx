@@ -5,7 +5,7 @@ import { useAccount, useReadContract, useWriteContract, usePublicClient } from '
 import { USDC_ADDRESS, USDC_ABI, CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { formatUnits, parseUnits } from 'viem';
-import { X, Layers, Plus, Trash2, ShieldAlert, Loader2, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { X, Layers, Plus, Trash2, ShieldAlert, Loader2, CheckCircle2, AlertCircle, Info, HelpCircle } from 'lucide-react';
 
 interface BatchSplitterProps {
   batch: any;
@@ -191,7 +191,15 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
           {/* Child Split Items */}
           <div className="space-y-3">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Child Splits Setup</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Child Splits Setup</span>
+                <div className="group relative inline-block">
+                  <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-650 transition-colors" />
+                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                    Enter the desired weight for each sub-batch child token. The total must sum to the parent weight.
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleAddSplit}
@@ -212,6 +220,7 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
                       type="number"
                       required
                       min="1"
+                      placeholder="E.g., 50"
                       value={split}
                       onChange={(e) => handleSplitValueChange(idx, e.target.value)}
                       className="w-full bg-transparent text-sm font-mono font-bold text-gray-900 focus:outline-none"

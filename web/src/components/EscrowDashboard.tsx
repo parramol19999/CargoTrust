@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
-import { CARGO_ESCROW_ADDRESS, truncateAddress, EURC_ADDRESS } from '@/lib/constants';
+import { CARGO_ESCROW_ADDRESS, truncateAddress, EURC_ADDRESS, USDC_ADDRESS } from '@/lib/constants';
 import CARGO_ESCROW_ABI from '@/components/CargoEscrowABI.json';
 import { ShieldCheck, Lock, Unlock, HelpCircle, Loader2, RefreshCw, XCircle, DollarSign, Calendar, AlertTriangle } from 'lucide-react';
 
@@ -77,8 +77,66 @@ export default function EscrowDashboard() {
           });
         }
 
-        loadedJobs.sort((a, b) => b.id - a.id);
-        setJobs(loadedJobs);
+        const bootstrapJobs = [
+          {
+            id: 901,
+            client: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
+            provider: "0x3f5c9e2b178a9c2a23eb29acb14e66299b9cf2a2",
+            evaluator: "0x4e6b5a325c4a",
+            token: USDC_ADDRESS,
+            tokenName: "USDC",
+            amount: 250,
+            expiry: Date.now() - 86400000 * 2,
+            status: 2,
+            statusText: "PAID",
+            deliverableHash: "QmYyY...",
+            tokenId: 1001,
+            isDamaged: false,
+            isDemo: true,
+          },
+          {
+            id: 902,
+            client: "0x1087E71CD83101adF154d8215522EadA51Bf891E",
+            provider: "0x9c3a1f54d2e3",
+            evaluator: "0x4e6b5a325c4a",
+            token: USDC_ADDRESS,
+            tokenName: "USDC",
+            amount: 320,
+            expiry: Date.now() + 86400000 * 5,
+            status: 1,
+            statusText: "IN ESCROW",
+            deliverableHash: "0x0",
+            tokenId: 1004,
+            isDamaged: false,
+            isDemo: true,
+          },
+          {
+            id: 903,
+            client: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
+            provider: "0x5b3a8d76a1c9",
+            evaluator: "0x4e6b5a325c4a",
+            token: USDC_ADDRESS,
+            tokenName: "USDC",
+            amount: 180,
+            expiry: Date.now() - 86400000 * 10,
+            status: 3,
+            statusText: "REFUNDED",
+            deliverableHash: "0x0",
+            tokenId: 1003,
+            isDamaged: true,
+            isDemo: true,
+          }
+        ];
+
+        const mergedJobs = [...loadedJobs];
+        bootstrapJobs.forEach(job => {
+          if (!mergedJobs.some(j => j.id === job.id)) {
+            mergedJobs.push(job);
+          }
+        });
+
+        mergedJobs.sort((a, b) => b.id - a.id);
+        setJobs(mergedJobs);
       } catch (err) {
         console.error(err);
         setErrorMsg('Error loading on-chain escrow job details.');
@@ -342,47 +400,90 @@ export default function EscrowDashboard() {
                 </div>
 
                 {/* Operations Panel */}
-                {job.status === 1 && (
-                  <div className="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3.5 gap-4">
-                    <div className="text-[10px] text-gray-400 max-w-md">
-                      {isEvaluator
-                        ? 'Confirm crop quality specs and release payout to seller.'
-                        : 'Awaiting lab QA report certification to release escrow payout.'}
-                    </div>
+                {job.status === 1 && (() => {
+                  let eligibilityBadge = null;
+                  if (job.isDamaged) {
+                    eligibilityBadge = (
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
+                        ✓ Refundable: Cargo Damaged
+                      </span>
+                    );
+                  } else if (isPastExpiry) {
+                    eligibilityBadge = (
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
+                        ✓ Refundable: Deadline Passed
+                      </span>
+                    );
+                  } else if (isSeller) {
+                    eligibilityBadge = (
+                      <span className="bg-cyan-50 text-cyan-700 border border-cyan-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
+                        ✓ Seller Release Eligible
+                      </span>
+                    );
+                  } else {
+                    const timeLeft = job.expiry - Date.now();
+                    const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
+                    eligibilityBadge = (
+                      <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
+                        🔒 Locked: Expires in {daysLeft > 0 ? daysLeft : 0}d
+                      </span>
+                    );
+                  }
 
-                    <div className="flex items-center gap-2">
-                      {(isEvaluator || isConnected) && (
-                        <button
-                          onClick={() => handleCertify(job.id)}
-                          disabled={actionLoadingId !== null}
-                          className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition duration-200"
-                        >
-                          {actionLoadingId === job.id ? (
-                            <Loader2 className="w-3 animate-spin" />
-                          ) : (
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                          )}
-                          Release Escrow
-                        </button>
-                      )}
+                  return (
+                    <div className="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3.5 gap-4">
+                      <div className="flex flex-wrap items-center gap-2.5 max-w-md">
+                        {eligibilityBadge}
+                        <span className="text-[10px] text-gray-400">
+                          {isEvaluator
+                            ? 'Confirm crop quality specs and release payout to seller.'
+                            : 'Awaiting lab QA report certification to release escrow payout.'}
+                        </span>
+                      </div>
 
-                      {(isBuyer || isSeller || isEvaluator) && (
-                        <button
-                          onClick={() => handleRefund(job.id)}
-                          disabled={actionLoadingId !== null || (!job.isDamaged && !isPastExpiry && !isSeller && !isEvaluator)}
-                          className="bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-100 text-gray-600 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-gray-600 disabled:hover:border-gray-200 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition duration-200"
-                        >
-                          {actionLoadingId === job.id ? (
-                            <Loader2 className="w-3 animate-spin" />
-                          ) : (
-                            <XCircle className="w-3.5 h-3.5" />
-                          )}
-                          Claim Refund
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {(isEvaluator || isConnected) && (
+                          <button
+                            onClick={() => handleCertify(job.id)}
+                            disabled={actionLoadingId !== null}
+                            className="bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition duration-200"
+                          >
+                            {actionLoadingId === job.id ? (
+                              <Loader2 className="w-3 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            )}
+                            Release Escrow
+                          </button>
+                        )}
+
+                        {(isBuyer || isSeller || isEvaluator) && (
+                          <button
+                            onClick={() => handleRefund(job.id)}
+                            disabled={actionLoadingId !== null || (!job.isDamaged && !isPastExpiry && !isSeller && !isEvaluator)}
+                            title={
+                              job.isDamaged
+                                ? "Refund is active because cargo is marked Damaged."
+                                : isPastExpiry
+                                ? "Refund is active because the delivery deadline has passed."
+                                : isSeller
+                                ? "Seller can voluntarily refund client."
+                                : "Refund locked until deadline expires or cargo is marked Damaged."
+                            }
+                            className="bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-100 text-gray-600 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-gray-600 disabled:hover:border-gray-200 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition duration-200"
+                          >
+                            {actionLoadingId === job.id ? (
+                              <Loader2 className="w-3 animate-spin" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                            Claim Refund
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

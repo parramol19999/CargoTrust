@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI, EURC_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
-import { ShoppingCart, Tag, MapPin, Loader2, RefreshCw, Layers, Calendar, ChevronRight } from 'lucide-react';
+import { ShoppingCart, Tag, MapPin, Loader2, RefreshCw, Layers, Calendar, ChevronRight, HelpCircle } from 'lucide-react';
 import { formatUnits, parseUnits } from 'viem';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
@@ -450,13 +450,21 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
 
                         {!isOwner && (
                           <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 text-xs font-semibold">
-                            <span className="text-gray-500">Pay With:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500">Pay With:</span>
+                              <div className="group relative inline-block">
+                                <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                                  Select stablecoin to pay. StableFX executes an atomic swap if it differs from listed currency.
+                                </div>
+                              </div>
+                            </div>
                             <select
                               value={selectedPayCurr}
                               onChange={(e) =>
                                 setPayCurrencies((prev) => ({ ...prev, [batch.id]: e.target.value as 'USDC' | 'EURC' }))
                               }
-                              className="bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-xs font-bold cursor-pointer"
+                              className="bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-xs font-bold cursor-pointer focus:outline-none"
                             >
                               <option value="USDC">USDC</option>
                               <option value="EURC">EURC</option>
@@ -469,11 +477,19 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                       {!isOwner && selectedPayCurr !== listedCurr && (
                         <div className="p-4 bg-emerald-50/30 border border-emerald-100/50 rounded-2xl space-y-3">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-500 font-medium">Slippage Limit:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500 font-medium">Slippage Limit:</span>
+                              <div className="group relative inline-block">
+                                <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                                  Maximum swap slippage percentage tolerated for live StableFX conversion.
+                                </div>
+                              </div>
+                            </div>
                             <select
                               value={slippage}
                               onChange={(e) => setSlippage(e.target.value)}
-                              className="bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-[11px] font-bold"
+                              className="bg-white border border-gray-200 rounded-lg px-2 py-0.5 text-[11px] font-bold cursor-pointer focus:outline-none"
                             >
                               <option value="0.1">0.1%</option>
                               <option value="0.5">0.5% (Default)</option>
@@ -566,16 +582,33 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                           <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Set Price</span>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Set Price</span>
+                                  <div className="group relative inline-block">
+                                    <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                                      Define the wholesale listing price for this agricultural batch.
+                                    </div>
+                                  </div>
+                                </div>
                                 <input
                                   type="number"
                                   value={listPrice}
                                   onChange={(e) => setListPrice(e.target.value)}
+                                  placeholder="E.g., 250"
                                   className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none"
                                 />
                               </div>
                               <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                                <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Currency</span>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Currency</span>
+                                  <div className="group relative inline-block">
+                                    <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                                      Select listing stablecoin denomination (USDC / EURC).
+                                    </div>
+                                  </div>
+                                </div>
                                 <select
                                   value={listingCurrency}
                                   onChange={(e) => setListingCurrency(e.target.value as 'USDC' | 'EURC')}

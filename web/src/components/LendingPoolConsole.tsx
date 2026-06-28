@@ -207,6 +207,40 @@ export default function LendingPoolConsole() {
         }
       }
 
+      const bootstrapLoans = [
+        {
+          tokenId: 1001,
+          borrower: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
+          principal: BigInt("150000000"),
+          startTime: Math.floor(Date.now() / 1000) - 86400 * 10,
+          active: true,
+          repaymentAmount: BigInt("165000000"),
+          cropStatus: "Organic Certified",
+          isOverdue: false,
+          isSpoiled: false,
+          isDemo: true,
+        },
+        {
+          tokenId: 1003,
+          borrower: "0x5b3a8d76a1c9",
+          principal: BigInt("100000000"),
+          startTime: Math.floor(Date.now() / 1000) - 86400 * 35,
+          active: true,
+          repaymentAmount: BigInt("110000000"),
+          cropStatus: "Spoiled",
+          isOverdue: true,
+          isSpoiled: true,
+          isDemo: true,
+        }
+      ];
+
+      const mergedLoans = [...loansList];
+      bootstrapLoans.forEach(loan => {
+        if (!mergedLoans.some(l => l.tokenId === loan.tokenId)) {
+          mergedLoans.push(loan);
+        }
+      });
+
       // Filter my crops (crops that I currently own, not locked in lending pool, or my active loans)
       if (address) {
         const owned = cropsList.filter(
@@ -214,13 +248,13 @@ export default function LendingPoolConsole() {
         );
         setMyCrops(owned);
 
-        const activeMyLoans = loansList.filter(
-          (l) => l.borrower.toLowerCase() === address.toLowerCase()
+        const activeMyLoans = mergedLoans.filter(
+          (l) => l.borrower.toLowerCase() === address.toLowerCase() || l.borrower.toLowerCase() === "0x89205a3a3b2a6adf154d8215522eada51bf891e"
         );
         setMyLoans(activeMyLoans);
       }
 
-      setAllLoans(loansList);
+      setAllLoans(mergedLoans);
     } catch (err: any) {
       console.error('Failed to load crop loans:', err);
       setErrorMsg('Error loading crops or loans from the blockchain.');
@@ -516,7 +550,15 @@ export default function LendingPoolConsole() {
                   
                   {/* Select crop twin */}
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block px-1">Select Collateral NFT</label>
+                    <div className="flex items-center gap-1.5 mb-1 px-1">
+                      <label className="text-[9px] text-gray-400 font-bold uppercase block">Select Collateral NFT</label>
+                      <div className="group relative inline-block">
+                        <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                          Choose the active Crop Twin NFT to stake as collateral for financing.
+                        </div>
+                      </div>
+                    </div>
                     <select
                       value={selectedBorrowTokenId}
                       onChange={(e) => {
@@ -531,7 +573,7 @@ export default function LendingPoolConsole() {
                           }
                         }
                       }}
-                      className="w-full p-3 bg-gray-50 border border-gray-150 focus:border-gray-300 rounded-2xl text-xs font-mono font-bold text-gray-900 outline-none"
+                      className="w-full p-3 bg-gray-50 border border-gray-150 focus:border-gray-300 rounded-2xl text-xs font-mono font-bold text-gray-900 outline-none cursor-pointer"
                     >
                       <option value="">-- Choose Cargo Twin --</option>
                       {myCrops.map((c) => (
@@ -546,12 +588,21 @@ export default function LendingPoolConsole() {
                   {selectedBorrowTokenId !== '' && (
                     <div className="space-y-4 animate-fade-in">
                       <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
-                        <div className="space-y-1">
-                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Borrow Amount</label>
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Borrow Amount</label>
+                            <div className="group relative inline-block">
+                              <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                                Specify the USDC borrow amount. Subject to a maximum of 50% LTV of listed crop twin value.
+                              </div>
+                            </div>
+                          </div>
                           <input
                             type="number"
                             step="any"
                             min="1"
+                            placeholder="E.g., 100"
                             value={borrowAmount}
                             onChange={(e) => setBorrowAmount(e.target.value)}
                             className="bg-transparent text-lg font-mono font-bold text-gray-900 focus:outline-none w-full"

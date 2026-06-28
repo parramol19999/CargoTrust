@@ -429,12 +429,21 @@ export default function VerifierStaking() {
 
           <form onSubmit={handleStake} className="space-y-4">
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
-              <div className="space-y-1">
-                <label className="text-[9px] text-gray-400 font-bold uppercase block">Staking Amount</label>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[9px] text-gray-400 font-bold uppercase block">Staking Amount</label>
+                  <div className="group relative inline-block">
+                    <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                      Amount of USDC to deposit as collateral. Active verifiers must maintain a minimum of 500.00 USDC.
+                    </div>
+                  </div>
+                </div>
                 <input
                   type="number"
                   min="1"
                   required
+                  placeholder="E.g., 500"
                   value={stakeAmount}
                   onChange={(e) => setStakeAmount(e.target.value)}
                   className="bg-transparent text-lg font-mono font-bold text-gray-900 focus:outline-none w-full"
@@ -526,12 +535,21 @@ export default function VerifierStaking() {
           {/* Request Withdraw Input */}
           <form onSubmit={handleRequestWithdraw} className="space-y-4">
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
-              <div className="space-y-1">
-                <label className="text-[9px] text-gray-400 font-bold uppercase block">Withdrawal Request Amount</label>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[9px] text-gray-400 font-bold uppercase block">Withdrawal Request Amount</label>
+                  <div className="group relative inline-block">
+                    <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
+                      Specify the amount of USDC to withdraw. Locked for a 7-day cooldown period.
+                    </div>
+                  </div>
+                </div>
                 <input
                   type="number"
                   min="1"
                   required
+                  placeholder="E.g., 500"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   className="bg-transparent text-lg font-mono font-bold text-gray-900 focus:outline-none w-full"

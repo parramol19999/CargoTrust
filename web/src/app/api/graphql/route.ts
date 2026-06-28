@@ -8,14 +8,95 @@ const client = createPublicClient({
   transport: http('https://rpc.testnet.arc.network')
 });
 
+const BOOTSTRAP_TWINS = [
+  {
+    id: "1001",
+    tokenId: 1001,
+    producer: "0x3f5c9e2b178a9c2a23eb29acb14e66299b9cf2a2",
+    origin: "Valle del Cauca, Colombia",
+    harvestDate: Math.floor(Date.now() / 1000) - 86400 * 5, // 5 days ago
+    latLong: "3.4372° N, 76.5225° W",
+    ipfsMetadata: "https://ipfs.io/ipfs/QmXyZ?desc=Specialty%20Organic%20Arabica%20Coffee%20Beans",
+    owner: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
+    priceUsdc: "250000000", // 250 USDC
+    isForSale: true,
+    status: "Organic Certified",
+    isEncrypted: false,
+    encryptedPrice: "",
+    weight: 500,
+    isDemo: true,
+    verifications: [
+      {
+        verifier: "0x4e6b5a325c4a",
+        verifierName: "Intertek AgriLabs",
+        notes: "Moisture content 11.2%, defect count 0. Pesticide screening negative."
+      }
+    ]
+  },
+  {
+    id: "1002",
+    tokenId: 1002,
+    producer: "0x7a892b3a1c8f1c8e1e7f9a8b1c4e7f8e8a9f8b7c",
+    origin: "Aomori Prefecture, Japan",
+    harvestDate: Math.floor(Date.now() / 1000) - 86400 * 8, // 8 days ago
+    latLong: "40.8244° N, 140.7400° E",
+    ipfsMetadata: "https://ipfs.io/ipfs/QmPpQ?desc=Premium%20Fuji%20Apples%20Export%20Batch",
+    owner: "0x25b9663748a4434595fc46259c071513",
+    priceUsdc: "450000000", // 450 USDC
+    isForSale: true,
+    status: "Sourcing Inspected",
+    isEncrypted: false,
+    encryptedPrice: "",
+    weight: 350,
+    isDemo: true,
+    verifications: []
+  },
+  {
+    id: "1003",
+    tokenId: 1003,
+    producer: "0x5b3a8d76a1c9",
+    origin: "Limpopo, South Africa",
+    harvestDate: Math.floor(Date.now() / 1000) - 86400 * 12, // 12 days ago
+    latLong: "23.4013° S, 29.4179° E",
+    ipfsMetadata: "https://ipfs.io/ipfs/QmZzZ?desc=Golden%20Maluma%20Avocado%20Export",
+    owner: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
+    priceUsdc: "180000000", // 180 USDC
+    isForSale: false,
+    status: "USDA Inspected",
+    isEncrypted: false,
+    encryptedPrice: "",
+    weight: 600,
+    isDemo: true,
+    verifications: []
+  },
+  {
+    id: "1004",
+    tokenId: 1004,
+    producer: "0x9c3a1f54d2e3",
+    origin: "Roi Et, Thailand",
+    harvestDate: Math.floor(Date.now() / 1000) - 86400 * 15,
+    latLong: "16.0538° N, 103.6520° E",
+    ipfsMetadata: "https://ipfs.io/ipfs/QmRrR?desc=Organic%20Jasmine%20Fragrant%20Rice",
+    owner: "0x1087E71CD83101adF154d8215522EadA51Bf891E",
+    priceUsdc: "320000000",
+    isForSale: true,
+    status: "Verified Quality",
+    isEncrypted: false,
+    encryptedPrice: "",
+    weight: 1200,
+    isDemo: true,
+    verifications: []
+  }
+];
+
 // Simple in-memory cache to ensure sub-second response times (<10ms on cache hit)
 let cacheTime = 0;
-let cachedBatches: any[] = [];
+let cachedBatches: any[] = [...BOOTSTRAP_TWINS];
 
 async function getCachedBatches() {
   const now = Date.now();
   // Cache for 10 seconds to keep fresh while avoiding rate limits
-  if (now - cacheTime < 10000 && cachedBatches.length > 0) {
+  if (now - cacheTime < 10000 && cachedBatches.length > BOOTSTRAP_TWINS.length) {
     return cachedBatches;
   }
 
@@ -43,14 +124,6 @@ async function getCachedBatches() {
         functionName: 'ownerOf',
         args: [BigInt(i)],
       });
-
-      // Get verifications
-      const verificationsResult: any = await client.readContract({
-        address: CARGO_REGISTRY_ADDRESS,
-        abi: CARGO_REGISTRY_ABI,
-        functionName: 'getChildTokens', // Using this to verify children if any, or just load verifications from registry if available
-        // Wait, let's load verifications count
-      }).catch(() => []);
 
       const [
         producer,
@@ -82,16 +155,30 @@ async function getCachedBatches() {
         isEncrypted: !!isEncrypted,
         encryptedPrice: encryptedPrice || '',
         weight: weight ? Number(weight.toString()) : 100,
-        verifications: []
+        isDemo: false,
+        verifications: [] as any[]
       });
     }
 
-    cachedBatches = loadedBatches;
+    const merged = [...loadedBatches];
+    
+    // Add bootstrap twins to ensure the dashboard is never empty
+    BOOTSTRAP_TWINS.forEach((twin) => {
+      if (!merged.some(b => Number(b.tokenId) === Number(twin.tokenId))) {
+        merged.push(twin);
+      }
+    });
+
+    cachedBatches = merged;
     cacheTime = now;
     return cachedBatches;
   } catch (err) {
     console.error('Error in GraphQL indexing resolver:', err);
-    return cachedBatches; // return stale on failure
+    // Fallback to bootstrap twins if client request fails
+    if (cachedBatches.length === 0) {
+      cachedBatches = [...BOOTSTRAP_TWINS];
+    }
+    return cachedBatches;
   }
 }
 

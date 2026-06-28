@@ -34,7 +34,8 @@ import {
   Pause, 
   AlertTriangle, 
   Award,
-  CircleDot
+  CircleDot,
+  HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -506,7 +507,13 @@ export default function AgentConsole() {
                     </div>
                   ) : (
                     swarmLogs.map((l) => (
-                      <div key={l.id} className="leading-relaxed border-l-2 border-gray-800 pl-3">
+                      <motion.div
+                        key={l.id}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        className="leading-relaxed border-l-2 border-gray-800 pl-3"
+                      >
                         <span className="text-gray-500 text-[10px] mr-2">{l.timestamp}</span>
                         <span className={`font-bold mr-1.5 ${
                           l.agent === 'Coordinator' ? 'text-purple-400' :
@@ -523,7 +530,7 @@ export default function AgentConsole() {
                         }>
                           {l.message}
                         </span>
-                      </div>
+                      </motion.div>
                     ))
                   )}
                 </div>
@@ -718,9 +725,17 @@ export default function AgentConsole() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                    Source Blockchain
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Source Blockchain
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        Choose the blockchain ecosystem from which you wish to send the tip. Circle CCTP will execute the bridging gaslessly.
+                      </div>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { id: 'base', name: 'Base' },
@@ -744,13 +759,22 @@ export default function AgentConsole() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                    Tip Amount (USDC equivalent)
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Tip Amount (USDC equivalent)
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        Specify the donation or tipping amount in USDC to support the grower.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="number"
                     value={tipAmount}
                     onChange={(e) => setTipAmount(e.target.value)}
+                    placeholder="E.g., 5"
                     className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none"
                   />
                 </div>
@@ -802,22 +826,39 @@ export default function AgentConsole() {
 
               <form onSubmit={handleRegisterAgent} className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Agent Name
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Agent Name
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        Identify the IoT tracking unit (e.g., Dalat organic coffee tracker).
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    placeholder="E.g., Dalat Cold-Chain Tracker"
                     className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Device Hardware ID
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Device Hardware ID
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        The physical MAC/hardware ID of the tracking unit.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
@@ -826,32 +867,51 @@ export default function AgentConsole() {
                       setDeviceId(e.target.value);
                       setAgentURI(`ipfs://QmAgent${e.target.value}`);
                     }}
+                    placeholder="E.g., DEV-7822"
                     className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-mono text-gray-800 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Agent Wallet Address (SCA / EOA)
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Agent Wallet Address (SCA / EOA)
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        The programmatic on-chain wallet address of the device to receive gasless telemetry payments.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
                     value={agentWalletAddress}
                     onChange={(e) => setAgentWalletAddress(e.target.value)}
+                    placeholder="E.g., 0x64e43D...0000"
                     className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-mono text-gray-800 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Metadata URI (ERC-8004 IPFS ID)
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Metadata URI (ERC-8004 IPFS ID)
+                    </label>
+                    <div className="group relative inline-block">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-655 transition-colors" />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                        IPFS/decentralized storage hash specifying hardware specifications and verification keys.
+                      </div>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
                     value={agentURI}
                     onChange={(e) => setAgentURI(e.target.value)}
+                    placeholder="E.g., ipfs://Qm..."
                     className="w-full p-3 bg-gray-50 border border-gray-150 rounded-xl text-xs font-mono text-gray-800 focus:outline-none"
                   />
                 </div>
