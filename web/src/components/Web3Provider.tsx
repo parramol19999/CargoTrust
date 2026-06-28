@@ -18,6 +18,8 @@ import {
 } from '@/lib/constants';
 import { CircleAuthProvider } from './CircleAuth';
 import { createContractCallChallengeAction, getTransactionHashByChallengeAction } from '@/lib/circleClient';
+import { ModalProvider } from '@/lib/modals/store';
+import ModalManagerRenderer from '@/components/modals/ModalManagerRenderer';
 
 export const arcTestnet = defineChain({
   id: ARC_TESTNET_CHAIN_ID,
@@ -119,8 +121,8 @@ export function circleUcwConnector() {
             const challengeId = res.challengeId;
             const { W3SSdk } = await import('@circle-fin/w3s-pw-web-sdk');
             const sdk = new W3SSdk();
-            if (process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL) {
-              (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL;
+            if (process.env.NEXT_PUBLIC_CIRCLE_SERVICE_URL) {
+              (sdk as any).serviceUrl = process.env.NEXT_PUBLIC_CIRCLE_SERVICE_URL;
             }
             sdk.setAppSettings({ appId: session.appId });
             sdk.setAuthentication({
@@ -198,7 +200,8 @@ const config = getDefaultConfig({
   ssr: true,
 });
 
-(config.connectors as any).push(circleUcwConnector());
+const ucwConnector = circleUcwConnector()(config as any);
+(config.connectors as any).push(ucwConnector);
 
 export function Web3Provider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -215,7 +218,10 @@ export function Web3Provider({ children }: { children: ReactNode }) {
           })}
         >
           <CircleAuthProvider>
-            {children}
+            <ModalProvider>
+              {children}
+              <ModalManagerRenderer />
+            </ModalProvider>
           </CircleAuthProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

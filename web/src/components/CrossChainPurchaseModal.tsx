@@ -13,7 +13,8 @@ import {
   Network, 
   ShieldCheck,
   Compass,
-  ArrowRightLeft
+  ArrowRightLeft,
+  HelpCircle
 } from 'lucide-react';
 import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
@@ -265,7 +266,15 @@ export default function CrossChainPurchaseModal({
               
               {/* Select Source Chain */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest block">Select Source Network</label>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest block">Select Source Network</label>
+                  <div className="group relative inline-block">
+                    <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
+                      Select the source blockchain where your USDC is located. Circle CCTP will securely burn and mint it to Arc.
+                    </div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {Object.entries(SUPPORTED_SOURCE_CHAINS).map(([key, chain]) => (
                     <button
