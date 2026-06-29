@@ -18,7 +18,7 @@ const BOOTSTRAP_TWINS = [
     latLong: "3.4372° N, 76.5225° W",
     ipfsMetadata: "https://ipfs.io/ipfs/QmXyZ?desc=Specialty%20Organic%20Arabica%20Coffee%20Beans",
     owner: "0x89205A3A3b2A6adF154d8215522EadA51Bf891E",
-    priceUsdc: "250000000", // 250 USDC
+    priceUsdc: "3000000", // 3 USDC
     isForSale: true,
     status: "Organic Certified",
     isEncrypted: false,
@@ -42,7 +42,7 @@ const BOOTSTRAP_TWINS = [
     latLong: "40.8244° N, 140.7400° E",
     ipfsMetadata: "https://ipfs.io/ipfs/QmPpQ?desc=Premium%20Fuji%20Apples%20Export%20Batch",
     owner: "0x25b9663748a4434595fc46259c071513",
-    priceUsdc: "450000000", // 450 USDC
+    priceUsdc: "5500000", // 5.5 USDC
     isForSale: true,
     status: "Sourcing Inspected",
     isEncrypted: false,
@@ -78,7 +78,7 @@ const BOOTSTRAP_TWINS = [
     latLong: "16.0538° N, 103.6520° E",
     ipfsMetadata: "https://ipfs.io/ipfs/QmRrR?desc=Organic%20Jasmine%20Fragrant%20Rice",
     owner: "0x1087E71CD83101adF154d8215522EadA51Bf891E",
-    priceUsdc: "320000000",
+    priceUsdc: "8000000", // 8 USDC
     isForSale: true,
     status: "Verified Quality",
     isEncrypted: false,
@@ -110,55 +110,67 @@ async function getCachedBatches() {
     const total = Number(nextTokenId.toString()) - 1;
     const loadedBatches = [];
 
-    for (let i = 1; i <= total; i++) {
-      const details: any = await client.readContract({
-        address: CARGO_REGISTRY_ADDRESS,
-        abi: CARGO_REGISTRY_ABI,
-        functionName: 'cargoBatches',
-        args: [BigInt(i)],
-      });
+     for (let i = 1; i <= total; i++) {
+      try {
+        const ownerAddress: any = await client.readContract({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'ownerOf',
+          args: [BigInt(i)],
+        });
 
-      const ownerAddress: any = await client.readContract({
-        address: CARGO_REGISTRY_ADDRESS,
-        abi: CARGO_REGISTRY_ABI,
-        functionName: 'ownerOf',
-        args: [BigInt(i)],
-      });
+        if (!ownerAddress || ownerAddress === '0x0000000000000000000000000000000000000000') {
+          continue;
+        }
 
-      const [
-        producer,
-        origin,
-        harvestDate,
-        latLong,
-        ipfsMetadata,
-        priceUsdc,
-        isForSale,
-        status,
-        paymentToken,
-        isEncrypted,
-        encryptedPrice,
-        weight
-      ] = details;
+        const details: any = await client.readContract({
+          address: CARGO_REGISTRY_ADDRESS,
+          abi: CARGO_REGISTRY_ABI,
+          functionName: 'cargoBatches',
+          args: [BigInt(i)],
+        });
 
-      loadedBatches.push({
-        id: i.toString(),
-        tokenId: i,
-        producer,
-        origin,
-        harvestDate: Number(harvestDate.toString()),
-        latLong,
-        ipfsMetadata,
-        owner: ownerAddress,
-        priceUsdc: priceUsdc.toString(),
-        isForSale,
-        status,
-        isEncrypted: !!isEncrypted,
-        encryptedPrice: encryptedPrice || '',
-        weight: weight ? Number(weight.toString()) : 100,
-        isDemo: false,
-        verifications: [] as any[]
-      });
-    }
+        const [
+          producer,
+          origin,
+          harvestDate,
+          latLong,
+          ipfsMetadata,
+          priceUsdc,
+          isForSale,
+          status,
+          paymentToken,
+          isEncrypted,
+          encryptedPrice,
+          weight
+        ] = details;
+
+        if (producer === '0x0000000000000000000000000000000000000000') {
+          continue;
+        }
+
+        loadedBatches.push({
+          id: i.toString(),
+          tokenId: i,
+          producer,
+          origin,
+          harvestDate: Number(harvestDate.toString()),
+          latLong,
+          ipfsMetadata,
+          owner: ownerAddress,
+          priceUsdc: priceUsdc.toString(),
+          isForSale,
+          status,
+          isEncrypted: !!isEncrypted,
+          encryptedPrice: encryptedPrice || '',
+          weight: weight ? Number(weight.toString()) : 100,
+          isDemo: false,
+          verifications: [] as any[]
+        });
+      } catch (tokenErr) {
+        // Silent catch for burned, split, or nonexistent tokens to keep console clean
+      }
+     }
 
     const merged = [...loadedBatches];
     
