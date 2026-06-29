@@ -144,7 +144,7 @@ contract CargoEscrow is Ownable, ReentrancyGuard {
     function certifyDeliverable(uint256 jobId) external nonReentrant {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.FUNDED, "Job must be funded");
-        require(msg.sender == job.evaluator, "Only evaluator can certify");
+        require(msg.sender == job.evaluator || msg.sender == job.client, "Only evaluator or client can certify");
 
         job.status = JobStatus.COMPLETED;
         emit JobCompleted(jobId);
