@@ -32,8 +32,11 @@ import TelemetryChart from '@/components/TelemetryChart';
 import AccessRequestPanel from '@/components/AccessRequestPanel';
 import LineageTree from '@/components/LineageTree';
 import ProvenanceMap from '@/components/ProvenanceMap';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 export default function ConsumerPortal() {
+  const { isSimpleMode } = useFriendlyMode();
   const { openModal } = useModal();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -112,7 +115,7 @@ export default function ConsumerPortal() {
 
           if (response.status === 402) {
             const errData = await response.json();
-            setStreamError(errData.message || 'Payment required to fetch telemetry.');
+            setStreamError(errData.error || errData.message || 'Payment required to fetch telemetry.');
             setIsStreaming(false);
             return;
           }
@@ -445,8 +448,8 @@ export default function ConsumerPortal() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const tid = parseInt(tokenIdInput.trim());
     if (isNaN(tid)) {
       setErrorMsg('Please enter a valid numeric Crop ID.');
@@ -461,10 +464,12 @@ export default function ConsumerPortal() {
       {/* Search Input inspired by flight search */}
       <div className="card-light p-6 relative">
         <h3 className="text-xl font-bold text-gray-900 mb-2 text-center md:text-left">
-          Scan Cryptographic Crop Provenance
+          {isSimpleMode ? 'Scan Coffee Farm Receipt' : 'Scan Cryptographic Crop Provenance'}
         </h3>
         <p className="text-xs text-gray-400 mb-6 text-center md:text-left">
-          Enter any on-chain Token ID to trace its path, quality testing, and B2B stablecoin trades.
+          {isSimpleMode 
+            ? 'Enter any Receipt ID to trace its farm origin, quality certifications, and purchase history.'
+            : 'Enter any on-chain Token ID to trace its path, quality testing, and B2B stablecoin trades.'}
         </p>
 
         <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
@@ -474,11 +479,13 @@ export default function ConsumerPortal() {
               type="text"
               value={tokenIdInput}
               onChange={(e) => setTokenIdInput(e.target.value)}
-              placeholder="E.g., 1 (Enter Crop Token ID)"
+              placeholder={isSimpleMode ? 'E.g., 1 (Enter Receipt ID)' : 'E.g., 1 (Enter Crop Token ID)'}
               className="w-full bg-transparent text-sm font-bold text-gray-900 focus:outline-none placeholder-gray-300"
             />
             <div className="group-hover:opacity-100 opacity-0 pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-[10px] rounded p-2 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center max-w-[200px]">
-              Search by entering the numeric Token ID of the crop twin registered on CargoTrust.
+              {isSimpleMode 
+                ? 'Search by entering the digital number of your coffee receipt.' 
+                : 'Search by entering the numeric Token ID of the crop twin registered on CargoTrust.'}
             </div>
           </div>
 
@@ -486,14 +493,17 @@ export default function ConsumerPortal() {
             type="submit"
             className="px-8 py-4 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-2xl text-xs tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-2"
           >
-            Verify Provenance
+            {isSimpleMode ? 'Trace Coffee' : 'Verify Provenance'}
             <ArrowRight className="w-4 h-4 text-white" />
           </button>
         </form>
 
         {errorMsg && (
-          <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold mt-4">
-            ⚠️ {errorMsg}
+          <div className="mt-4">
+            <ErrorCard
+              error={errorMsg}
+              onRetry={() => handleSearch()}
+            />
           </div>
         )}
       </div>
@@ -501,7 +511,9 @@ export default function ConsumerPortal() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Loader2 className="w-8 h-8 text-gray-900 animate-spin mb-3" />
-          <p className="text-xs font-mono text-gray-400">Reconstructing secure provenance timeline...</p>
+          <p className="text-xs font-mono text-gray-400">
+            {isSimpleMode ? 'Reconstructing coffee timeline...' : 'Reconstructing secure provenance timeline...'}
+          </p>
         </div>
       ) : cargo ? (
         <div className="space-y-6">
@@ -512,10 +524,10 @@ export default function ConsumerPortal() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
-                    CROP TOKEN ID: #{cargo.id}
+                    {isSimpleMode ? 'RECEIPT ID' : 'CROP TOKEN ID'}: #{cargo.id}
                   </span>
                   <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
-                    WEIGHT: {cargo.weight ? cargo.weight.toString() : '100'} UNITS
+                    {isSimpleMode ? `WEIGHT: ${cargo.weight ? cargo.weight.toString() : '100'} LBS` : `WEIGHT: ${cargo.weight ? cargo.weight.toString() : '100'} UNITS`}
                   </span>
                   {cargo.isEncrypted && (
                     <span className={`px-2 py-0.5 text-[9px] font-mono font-bold rounded border uppercase tracking-wider ${
@@ -523,7 +535,9 @@ export default function ConsumerPortal() {
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-red-50 text-red-600 border-red-200'
                     }`}>
-                      {decryptedData ? '🔓 Decrypted' : '🔒 Encrypted'}
+                      {decryptedData 
+                        ? (isSimpleMode ? '🔓 Unlocked' : '🔓 Decrypted') 
+                        : (isSimpleMode ? '🔒 Hidden' : '🔒 Encrypted')}
                     </span>
                   )}
                   {cargo.isEncrypted && !decryptedData && (
@@ -533,7 +547,7 @@ export default function ConsumerPortal() {
                       className="px-2.5 py-1 bg-gray-950 hover:bg-gray-900 text-white rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex items-center gap-1"
                     >
                       {decryptLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlock className="w-3 h-3" />}
-                      Decrypt Details
+                      {isSimpleMode ? 'Unlock Details' : 'Decrypt Details'}
                     </button>
                   )}
                 </div>
@@ -544,16 +558,19 @@ export default function ConsumerPortal() {
                   {cargo.isEncrypted
                     ? decryptedData
                       ? decryptedData.origin
-                      : 'Private Crop Batch 🔒'
+                      : (isSimpleMode ? 'Hidden Coffee Batch 🔒' : 'Private Crop Batch 🔒')
                     : cargo.origin}
                 </h4>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold block">Current Custodian</span>
-                <span className="text-xs font-mono font-bold text-gray-900 select-all">
-                  {owner}
+                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold block">
+                  {isSimpleMode ? 'Current Owner' : 'Current Custodian'}
+                </span>
+                <span className="text-xs font-mono font-bold text-gray-900 select-all" title={owner}>
+                  {truncateAddress(owner, 8)}
                 </span>
               </div>
+            </div>
 
             {/* Tab Selector */}
             <div className="flex border-b border-gray-150 mb-6">
@@ -565,7 +582,7 @@ export default function ConsumerPortal() {
                     : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
-                Provenance Timeline
+                {isSimpleMode ? 'Coffee Origin Timeline' : 'Provenance Timeline'}
               </button>
               <button
                 onClick={() => setActiveTab('telemetry')}
@@ -576,7 +593,7 @@ export default function ConsumerPortal() {
                 }`}
               >
                 <Activity className="w-3.5 h-3.5 text-cyan-600 animate-pulse" />
-                Live Telemetry Stream (x402)
+                {isSimpleMode ? 'Live Temperature Stream' : 'Live Telemetry Stream (x402)'}
               </button>
             </div>
 
@@ -604,7 +621,7 @@ export default function ConsumerPortal() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-700 border border-gray-200/60 rounded text-[9px] font-bold">
                         <Leaf className="w-3 h-3 text-gray-500" />
-                        PHASE 1: IMMUTABLE HARVEST ANCHOR
+                        {isSimpleMode ? 'STEP 1: FARM ORIGIN CERTIFICATE' : 'PHASE 1: IMMUTABLE HARVEST ANCHOR'}
                       </span>
                       <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
@@ -616,30 +633,34 @@ export default function ConsumerPortal() {
                       {cargo.isEncrypted
                         ? decryptedData
                           ? decryptedData.origin
-                          : 'Origin Details Encrypted 🔒'
+                          : (isSimpleMode ? 'Origin Details Hidden 🔒' : 'Origin Details Encrypted 🔒')
                         : cargo.origin}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       {cargo.isEncrypted
                         ? decryptedData
                           ? decryptedData.description
-                          : `${cargo.description.slice(0, 32)}... (Encrypted Metadata Payload 🔒)`
+                          : (isSimpleMode ? `${cargo.description.slice(0, 32)}... (Hidden Information 🔒)` : `${cargo.description.slice(0, 32)}... (Encrypted Metadata Payload 🔒)`)
                         : cargo.description}
                     </p>
  
                     <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200/60 text-[10px] font-mono text-gray-500">
                       <div>
-                        <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">Producer Address</span>
+                        <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">
+                          {isSimpleMode ? 'Producer ID' : 'Producer Address'}
+                        </span>
                         <span className="text-gray-700 block text-ellipsis overflow-hidden whitespace-nowrap">{cargo.producer}</span>
                       </div>
                       <div>
-                        <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">GPS Coordinates</span>
+                        <span className="block text-gray-400 uppercase tracking-widest font-bold text-[8px]">
+                          {isSimpleMode ? 'Farm GPS Location' : 'GPS Coordinates'}
+                        </span>
                         <span className="text-gray-900 font-bold flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-gray-400" />
                           {cargo.isEncrypted
                             ? decryptedData
                               ? decryptedData.latLong
-                              : 'Redacted (Encrypted 🔒)'
+                              : (isSimpleMode ? 'Redacted (Hidden 🔒)' : 'Redacted (Encrypted 🔒)')
                             : cargo.latLong}
                         </span>
                       </div>
@@ -656,12 +677,12 @@ export default function ConsumerPortal() {
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-700 border border-gray-200/60 rounded text-[9px] font-bold mb-2">
                       <ShieldCheck className="w-3 h-3 text-gray-500" />
-                      PHASE 2: INDEPENDENT LAB VERIFICATION
+                      {isSimpleMode ? 'STEP 2: QUALITY & HEALTH REPORT' : 'PHASE 2: INDEPENDENT LAB VERIFICATION'}
                     </span>
 
                     {verifications.length === 0 ? (
                       <div className="text-xs text-gray-400 py-2 italic">
-                        Laboratory inspection results pending verifier signature.
+                        {isSimpleMode ? 'Laboratory reports are pending verification.' : 'Laboratory inspection results pending verifier signature.'}
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -670,21 +691,21 @@ export default function ConsumerPortal() {
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-gray-900">{v.credentialType}</span>
                               <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded text-[9px] font-bold">
-                                Verified ✓
+                                {isSimpleMode ? 'Certified ✓' : 'Verified ✓'}
                               </span>
                             </div>
 
                             <div className="text-[10px] text-gray-500 font-mono space-y-1">
                               <div className="flex justify-between">
-                                <span>Verifier Name:</span>
+                                <span>{isSimpleMode ? 'Authorized Lab:' : 'Verifier Name:'}</span>
                                 <span className="text-gray-900 font-bold">{v.verifierName}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span>Verifier Key:</span>
+                                <span>{isSimpleMode ? 'Lab Signature ID:' : 'Verifier Key:'}</span>
                                 <span className="text-gray-700 select-all">{v.verifier}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span>W3C Proof IPFS:</span>
+                                <span>{isSimpleMode ? 'Secure Report File:' : 'W3C Proof IPFS:'}</span>
                                 <a
                                   href={`https://ipfs.io/ipfs/${v.ipfsVcHash.replace('ipfs://', '')}`}
                                   target="_blank"
@@ -711,7 +732,7 @@ export default function ConsumerPortal() {
                   <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-700 border border-gray-200/60 rounded text-[9px] font-bold mb-2">
                       <ShoppingBag className="w-3 h-3 text-gray-500" />
-                      PHASE 3: B2B COMMERCE SETTLEMENTS
+                      {isSimpleMode ? 'STEP 3: TRADE & OWNERSHIP BOARD' : 'PHASE 3: B2B COMMERCE SETTLEMENTS'}
                     </span>
 
                     <div className="bg-white border border-gray-100 rounded-xl p-3 text-xs space-y-2">
@@ -725,24 +746,26 @@ export default function ConsumerPortal() {
                       </div>
                       {cargo.isEncrypted && (
                         <div className="flex justify-between border-t border-gray-100 pt-2 mt-2">
-                          <span className="text-gray-400">Target Harvest Price:</span>
+                          <span className="text-gray-400">
+                            {isSimpleMode ? 'Minimum Selling Price:' : 'Target Harvest Price:'}
+                          </span>
                           <span className="font-mono font-bold text-gray-900">
-                            {decryptedData ? `${decryptedData.price} USDC 🔓` : 'Redacted (Encrypted 🔒)'}
+                            {decryptedData ? `${decryptedData.price} USDC 🔓` : (isSimpleMode ? 'Redacted (Hidden 🔒)' : 'Redacted (Encrypted 🔒)')}
                           </span>
                         </div>
                       )}
                       <div className="flex justify-between">
-                        <span>Verification Status:</span>
+                        <span>{isSimpleMode ? 'Shipment Status:' : 'Settlement Status:'}</span>
                         <span className="text-cyan-600 font-bold">{cargo.status}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>On-chain Owner:</span>
+                        <span>{isSimpleMode ? 'Registered Owner:' : 'On-chain Owner:'}</span>
                         <span className="font-mono font-bold text-gray-900">{truncateAddress(owner, 6)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-
+ 
               </div>
             </div>
             ) : (
@@ -755,11 +778,13 @@ export default function ConsumerPortal() {
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-red-500 animate-ping' : 'bg-gray-300'}`} />
                       <span className="text-xs font-bold text-gray-900">
-                        {isStreaming ? 'Streaming telemetry logs...' : 'Stream offline'}
+                        {isStreaming 
+                          ? (isSimpleMode ? 'Receiving temperature updates...' : 'Streaming telemetry logs...') 
+                          : (isSimpleMode ? 'Monitoring offline' : 'Stream offline')}
                       </span>
                     </div>
                     <span className="text-[10px] text-gray-400 block">
-                      Nanopayment Rate: $0.000001 USDC / sec
+                      {isSimpleMode ? 'Cost: $0.000001 per second (Automatic micropayments)' : 'Nanopayment Rate: $0.000001 USDC / sec'}
                     </span>
                   </div>
 
@@ -772,12 +797,12 @@ export default function ConsumerPortal() {
                         onChange={(e) => setTempSpikeSimulated(e.target.checked)}
                         className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer w-3.5 h-3.5" 
                       />
-                      <span>Simulate Temp Spike</span>
+                      <span>{isSimpleMode ? 'Simulate High Heat' : 'Simulate Temp Spike'}</span>
                     </label>
 
                     {/* Fund Escrow */}
                     <div className="px-3 py-1.5 bg-white border border-gray-150 rounded-xl flex items-center gap-2 text-xs font-mono font-bold text-gray-700">
-                      <span>Escrow: ${escrowBalance.toFixed(6)} USDC</span>
+                      <span>{isSimpleMode ? `Balance: $${escrowBalance.toFixed(6)}` : `Escrow: $${escrowBalance.toFixed(6)} USDC`}</span>
                       <button
                         onClick={() => {
                           setEscrowBalance(prev => prev + 0.000050);
@@ -785,7 +810,7 @@ export default function ConsumerPortal() {
                         className="p-1 hover:bg-gray-100 text-cyan-600 rounded-md transition-all flex items-center gap-0.5 animate-pulse"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Fund</span>
+                        <span>{isSimpleMode ? 'Top Up' : 'Fund'}</span>
                       </button>
                     </div>
 
@@ -800,12 +825,12 @@ export default function ConsumerPortal() {
                       {isStreaming ? (
                         <>
                           <Pause className="w-4 h-4" />
-                          <span>Pause Stream</span>
+                          <span>{isSimpleMode ? 'Pause' : 'Pause Stream'}</span>
                         </>
                       ) : (
                         <>
                           <Play className="w-4 h-4" />
-                          <span>Start Stream</span>
+                          <span>{isSimpleMode ? 'Start Tracking' : 'Start Stream'}</span>
                         </>
                       )}
                     </button>
@@ -813,9 +838,10 @@ export default function ConsumerPortal() {
                 </div>
 
                 {streamError && (
-                  <div className="p-3.5 bg-red-50 border border-red-105 rounded-2xl text-xs font-semibold text-red-600 font-mono">
-                    ⚠️ {streamError}
-                  </div>
+                  <ErrorCard
+                    error={streamError}
+                    onRetry={handleToggleStream}
+                  />
                 )}
 
                 {/* Telemetry Chart Component */}
@@ -828,7 +854,7 @@ export default function ConsumerPortal() {
                 />
 
               </div>
-            )}</div>
+            )}
 
           </div>
 

@@ -96,7 +96,8 @@ export async function validatePaymentToken(
     rateLimitCache.set(ip, now);
 
     // 3. Cryptographic Signature Verification
-    const sessionNonce = nonce.split('-')[0];
+    const parts = nonce.split('-');
+    const sessionNonce = parts.slice(0, -1).join('-');
     const message = `Authorize Telemetry Stream Session for Crop Twin #${tokenId} (Session: ${sessionNonce})`;
     const isSignatureValid = await verifyMessage({
       address: buyerAddress as `0x${string}`,
