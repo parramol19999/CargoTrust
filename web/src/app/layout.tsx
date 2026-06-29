@@ -3,7 +3,11 @@ import "./globals.css";
 import { Web3Provider } from "@/components/Web3Provider";
 
 export const metadata: Metadata = {
-  title: "CargoTrust | Decentralized Supply Chain Identity & Traceability Platform",
+  metadataBase: new URL("http://transitnet.xyz"),
+  title: {
+    default: "CargoTrust | Decentralized Supply Chain Identity & Traceability Platform",
+    template: "%s | CargoTrust",
+  },
   description:
     "Decentralized Supply Chain Identity, Cryptographic Quality Verification, and Payment-Linked Atomic Settlements built on Arc Network with USDC.",
   keywords: [
@@ -17,10 +21,21 @@ export const metadata: Metadata = {
     "W3C DID",
     "Organic Certified"
   ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "CargoTrust Traceability & Commerce Platform",
     description: "Securing High-End Global Supply Chains with Arc and USDC.",
+    url: "http://transitnet.xyz",
+    siteName: "CargoTrust",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CargoTrust Traceability & Commerce Platform",
+    description: "Securing High-End Global Supply Chains with Arc and USDC.",
   },
   icons: {
     icon: [
