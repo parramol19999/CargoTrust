@@ -38,6 +38,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ErrorCard from '@/components/ErrorCard';
 
 interface ActiveAgent {
   id: string;
@@ -149,8 +150,8 @@ export default function AgentConsole() {
   }, []);
 
   // Standard IoT Registry Form
-  const handleRegisterAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegisterAgent = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     if (!isConnected) {
@@ -916,11 +917,12 @@ export default function AgentConsole() {
                   />
                 </div>
 
-                {errorMsg && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[11px] font-mono text-red-600">
-                    ⚠️ {errorMsg}
-                  </div>
-                )}
+                 {errorMsg && (
+                   <ErrorCard
+                     error={errorMsg}
+                     onRetry={handleRegisterAgent}
+                   />
+                 )}
 
                 {successMsg && (
                   <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[11px] text-emerald-700">
