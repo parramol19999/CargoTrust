@@ -10,8 +10,8 @@ export const USDC_DECIMALS = 6;
 export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a' as const;
 export const EURC_DECIMALS = 6;
 
-export const CARGO_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_CARGO_REGISTRY_ADDRESS || '0x2b27B16F0AAf518FF91690Df2B4FA39C5f5BCe99') as `0x${string}`;
-export const CARGO_ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_CARGO_ESCROW_ADDRESS || '0x935603281481F1c9acf1454964FF5DA7EBfc8Ff9') as `0x${string}`;
+export const CARGO_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_CARGO_REGISTRY_ADDRESS || '0x0a231C10eC37E2387Ee8024544b0210A2f9Ed98e') as `0x${string}`;
+export const CARGO_ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_CARGO_ESCROW_ADDRESS || '0xD9fa7B19AB322dAeC3e7eEcBBBb2367D7934039C') as `0x${string}`;
 
 // ─── Minimal USDC ABI (for balances and approvals) ───
 export const USDC_ABI = [
@@ -62,7 +62,7 @@ export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
-export const AGENT_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS || '0x33af1Df6e803E6ceAAF06615e85eA5732C44522C') as `0x${string}`;
-export const VERIFIER_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_VERIFIER_REGISTRY_ADDRESS || '0xc2c23E68C55C2d598bdA0B6a8e7C570A79fe3A42') as `0x${string}`;
-export const CROP_LENDING_POOL_ADDRESS = (process.env.NEXT_PUBLIC_CROP_LENDING_POOL_ADDRESS || '0xDE647D20c6A05A4a5f9D31f35496A08E443e9869') as `0x${string}`;
+export const AGENT_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS || '0x58b26bA54254fBdaB31DEa012411499dDAE81AB5') as `0x${string}`;
+export const VERIFIER_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_VERIFIER_REGISTRY_ADDRESS || '0xaA3Bd77e6952DbeA94e51DDe41b32d96C559C3cF') as `0x${string}`;
+export const CROP_LENDING_POOL_ADDRESS = (process.env.NEXT_PUBLIC_CROP_LENDING_POOL_ADDRESS || '0x4e77709401a75e0296405F9be288863fEec880A1') as `0x${string}`;
 
