@@ -14,8 +14,12 @@ export interface ActiveAgent {
 const DB_FILE = path.join(process.cwd(), 'agents_db.json');
 
 function ensureDbFile() {
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify([]));
+  try {
+    if (!fs.existsSync(DB_FILE)) {
+      fs.writeFileSync(DB_FILE, JSON.stringify([]));
+    }
+  } catch (e) {
+    console.warn('Warning: Cannot write agents DB file (read-only filesystem):', DB_FILE);
   }
 }
 

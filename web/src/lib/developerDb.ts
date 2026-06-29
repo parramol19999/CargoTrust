@@ -26,8 +26,12 @@ export interface DatabaseSchema {
 const DB_PATH = path.join(process.cwd(), '../shared_db.json');
 
 function getDb(): DatabaseSchema {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ api_keys: [], webhooks: [] }, null, 2));
+  try {
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify({ api_keys: [], webhooks: [] }, null, 2));
+    }
+  } catch (err) {
+    console.warn('Warning: Cannot write shared DB file (read-only filesystem):', DB_PATH);
   }
   try {
     const data = fs.readFileSync(DB_PATH, 'utf8');

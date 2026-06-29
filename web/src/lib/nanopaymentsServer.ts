@@ -15,8 +15,12 @@ const DB_FILE = path.join(process.cwd(), 'telemetry_db.json');
  * Ensures the local database JSON file exists.
  */
 function ensureDbFile() {
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify([]));
+  try {
+    if (!fs.existsSync(DB_FILE)) {
+      fs.writeFileSync(DB_FILE, JSON.stringify([]));
+    }
+  } catch (e) {
+    console.warn('Warning: Cannot write telemetry DB file (read-only filesystem):', DB_FILE);
   }
 }
 

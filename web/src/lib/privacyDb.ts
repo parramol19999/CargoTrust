@@ -31,8 +31,12 @@ const KEYS_FILE = path.join(process.cwd(), 'crop_keys_db.json');
 const USER_KEYS_FILE = path.join(process.cwd(), 'user_ecdh_keys_db.json');
 
 function ensureDbFile(filePath: string) {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify([]));
+  try {
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, JSON.stringify([]));
+    }
+  } catch (e) {
+    console.warn('Warning: Cannot write privacy DB file (read-only filesystem):', filePath);
   }
 }
 
