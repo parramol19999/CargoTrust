@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { CARGO_REGISTRY_ADDRESS, ARC_TESTNET_EXPLORER, USDC_ADDRESS } from '@/lib/constants';
 import { ExternalLink, ShieldCheck, Heart } from 'lucide-react';
 
@@ -8,6 +9,18 @@ export default function Footer() {
   return (
     <footer className="w-full border-t border-gray-100 bg-white text-gray-500 py-8 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* SaaS Page Links */}
+        <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs font-semibold text-slate-500 mb-6 border-b border-slate-100/60 pb-6">
+          <Link href="/docs" className="hover:text-slate-900 transition">Documentation</Link>
+          <Link href="/faq" className="hover:text-slate-900 transition">FAQ</Link>
+          <Link href="/about" className="hover:text-slate-900 transition">About Team</Link>
+          <Link href="/contact" className="hover:text-slate-900 transition">Contact Support</Link>
+          <Link href="/legal" className="hover:text-slate-900 transition">Legal Center</Link>
+          <Link href="/legal/privacy" className="hover:text-slate-900 transition">Privacy</Link>
+          <Link href="/legal/terms" className="hover:text-slate-900 transition">Terms</Link>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-gray-900" />

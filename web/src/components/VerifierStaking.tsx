@@ -25,8 +25,11 @@ import {
   History,
   Activity
 } from 'lucide-react';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 export default function VerifierStaking() {
+  const { isSimpleMode } = useFriendlyMode();
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -158,8 +161,8 @@ export default function VerifierStaking() {
 
   // ─── Actions ───
 
-  const handleStake = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStake = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address) {
       setErrorMsg('Wallet not connected.');
       return;
@@ -217,8 +220,8 @@ export default function VerifierStaking() {
     }
   };
 
-  const handleRequestWithdraw = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRequestWithdraw = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address) return;
     setErrorMsg('');
     setSuccessMsg('');
@@ -329,7 +332,9 @@ export default function VerifierStaking() {
         {/* Active Stake */}
         <div className="p-5 bg-white border border-gray-100 rounded-2xl flex flex-col justify-between shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Collateral</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              {isSimpleMode ? 'Active Security Deposit' : 'Active Collateral'}
+            </span>
             <div className="p-1.5 bg-gray-50 border border-gray-100 rounded-lg">
               <Coins className="w-4 h-4 text-gray-900" />
             </div>
@@ -341,11 +346,11 @@ export default function VerifierStaking() {
             <div className="flex items-center gap-1 mt-1 text-[10px]">
               {hasMinStake ? (
                 <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Registry Accredited
+                  <ShieldCheck className="w-3.5 h-3.5" /> {isSimpleMode ? 'Accredited ✓' : 'Registry Accredited'}
                 </span>
               ) : (
                 <span className="text-red-500 font-bold flex items-center gap-0.5">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Under-collateralized
+                  <AlertTriangle className="w-3.5 h-3.5" /> {isSimpleMode ? 'Insufficient Deposit ⚠️' : 'Under-collateralized'}
                 </span>
               )}
             </div>
@@ -376,7 +381,9 @@ export default function VerifierStaking() {
         {/* Accrued Reward Fees */}
         <div className="p-5 bg-white border border-gray-100 rounded-2xl flex flex-col justify-between shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Accrued Rewards</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              {isSimpleMode ? 'Earned Verification Fees' : 'Accrued Rewards'}
+            </span>
             <div className="p-1.5 bg-gray-50 border border-gray-100 rounded-lg">
               <ArrowDownCircle className="w-4 h-4 text-emerald-600" />
             </div>
@@ -390,7 +397,7 @@ export default function VerifierStaking() {
               disabled={!rewardBalance || BigInt(rewardBalance.toString()) === 0n || loadingStep !== 'idle'}
               className="mt-2 text-[10px] text-cyan-600 hover:text-cyan-700 font-bold flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Withdraw Rewards &rarr;
+              {isSimpleMode ? 'Claim Earned Fees →' : 'Withdraw Rewards →'}
             </button>
           </div>
         </div>
@@ -398,7 +405,9 @@ export default function VerifierStaking() {
         {/* Total Penalties / Slashes */}
         <div className="p-5 bg-white border border-gray-100 rounded-2xl flex flex-col justify-between shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Slashed</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              {isSimpleMode ? 'Total Penalties' : 'Total Slashed'}
+            </span>
             <div className="p-1.5 bg-red-50 border border-red-100 rounded-lg">
               <AlertTriangle className="w-4 h-4 text-red-600" />
             </div>
@@ -407,7 +416,9 @@ export default function VerifierStaking() {
             <div className="text-2xl font-bold font-mono text-red-600">
               {totalSlashed ? Number(formatUnits(totalSlashed as bigint, 6)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
             </div>
-            <span className="text-[10px] text-gray-400 block mt-1">Audit-recorded penalties</span>
+            <span className="text-[10px] text-gray-400 block mt-1">
+              {isSimpleMode ? 'Registered audit penalties' : 'Audit-recorded penalties'}
+            </span>
           </div>
         </div>
 
@@ -420,22 +431,27 @@ export default function VerifierStaking() {
         <div className="p-6 bg-white border border-gray-150 rounded-2xl space-y-4 shadow-sm">
           <div className="flex items-center gap-2">
             <Coins className="w-5 h-5 text-gray-900" />
-            <h4 className="text-sm font-bold text-gray-900">Deposit Staking Collateral</h4>
+            <h4 className="text-sm font-bold text-gray-900">
+              {isSimpleMode ? 'Deposit Security Collateral' : 'Deposit Staking Collateral'}
+            </h4>
           </div>
           <p className="text-xs text-gray-400">
-            Stake USDC to activate or replenish your accreditation status. Active verifiers must maintain a minimum of 
-            {' '}<span className="font-bold text-gray-900">500.00 USDC</span> at all times to submit verification reports.
+            {isSimpleMode 
+              ? 'Deposit USDC to activate your verifier accreditation. You must keep a minimum deposit of 500 USDC to verify crop batches.'
+              : 'Stake USDC to activate or replenish your accreditation status. Active verifiers must maintain a minimum of 500.00 USDC at all times to submit verification reports.'}
           </p>
 
           <form onSubmit={handleStake} className="space-y-4">
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <label className="text-[9px] text-gray-400 font-bold uppercase block">Staking Amount</label>
+                  <label className="text-[9px] text-gray-400 font-bold uppercase block">
+                    {isSimpleMode ? 'Deposit Amount' : 'Staking Amount'}
+                  </label>
                   <div className="group relative inline-block">
                     <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
-                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                      Amount of USDC to deposit as collateral. Active verifiers must maintain a minimum of 500.00 USDC.
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal text-center">
+                      {isSimpleMode ? 'Amount of USDC to deposit as security.' : 'Amount of USDC to deposit as collateral. Active verifiers must maintain a minimum of 500.00 USDC.'}
                     </div>
                   </div>
                 </div>
@@ -453,7 +469,7 @@ export default function VerifierStaking() {
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-gray-400 px-1 font-mono">
-              <span>Your USDC Balance:</span>
+              <span>{isSimpleMode ? 'Your Wallet USDC Balance:' : 'Your USDC Balance:'}</span>
               <span>{usdcBalance ? Number(formatUnits(usdcBalance as bigint, 6)).toFixed(2) : '0.00'} USDC</span>
             </div>
 
@@ -465,19 +481,19 @@ export default function VerifierStaking() {
               {loadingStep === 'approving' && (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Approving USDC...</span>
+                  <span>{isSimpleMode ? 'Approving Deposit...' : 'Approving USDC...'}</span>
                 </>
               )}
               {loadingStep === 'staking' && (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Executing Stake...</span>
+                  <span>{isSimpleMode ? 'Depositing...' : 'Executing Stake...'}</span>
                 </>
               )}
               {loadingStep === 'idle' && (
                 <>
                   <ArrowUpCircle className="w-4 h-4" />
-                  <span>Stake USDC Collateral</span>
+                  <span>{isSimpleMode ? 'Deposit Security Collateral' : 'Stake USDC Collateral'}</span>
                 </>
               )}
             </button>
@@ -488,11 +504,14 @@ export default function VerifierStaking() {
         <div className="p-6 bg-white border border-gray-150 rounded-2xl space-y-4 shadow-sm">
           <div className="flex items-center gap-2">
             <Lock className="w-5 h-5 text-gray-900" />
-            <h4 className="text-sm font-bold text-gray-900">Withdrawal Lock & Cooldown</h4>
+            <h4 className="text-sm font-bold text-gray-900">
+              {isSimpleMode ? 'Withdrawal Safety Period' : 'Withdrawal Lock & Cooldown'}
+            </h4>
           </div>
           <p className="text-xs text-gray-400">
-            To prevent instant exit during potential dispute investigations, all withdrawals require a 
-            {' '}<span className="font-bold text-gray-900">7-day freeze period</span> before funds are released.
+            {isSimpleMode 
+              ? 'To ensure security during quality disputes, all withdrawals have a 7-day safety period before funds are returned.'
+              : 'To prevent instant exit during potential dispute investigations, all withdrawals require a 7-day freeze period before funds are released.'}
           </p>
 
           {/* Active Cooldown Request Info */}
@@ -500,17 +519,19 @@ export default function VerifierStaking() {
             <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl space-y-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] font-bold text-amber-800 block uppercase">Active Withdrawal Cooldown</span>
+                  <span className="text-[10px] font-bold text-amber-800 block uppercase">
+                    {isSimpleMode ? 'Active Safety Freeze' : 'Active Withdrawal Cooldown'}
+                  </span>
                   <div className="text-lg font-mono font-bold text-amber-950">
                     {Number(formatUnits(pendingWithdrawAmount, 6)).toFixed(2)} USDC
                   </div>
                 </div>
                 <span className="px-2 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 rounded text-[9px] font-bold">
-                  Frozen
+                  {isSimpleMode ? 'Locked' : 'Frozen'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs text-amber-800 border-t border-amber-200/50 pt-2 font-mono">
-                <span>Unlock In:</span>
+                <span>{isSimpleMode ? 'Unlock In:' : 'Unlock In:'}</span>
                 <span className="font-bold">{timeLeftStr || 'Checking...'}</span>
               </div>
 
@@ -526,7 +547,7 @@ export default function VerifierStaking() {
                   ) : (
                     <CheckCircle className="w-4 h-4" />
                   )}
-                  <span>Release & Finalize Withdrawal</span>
+                  <span>{isSimpleMode ? 'Release & Return Funds' : 'Release & Finalize Withdrawal'}</span>
                 </button>
               )}
             </div>
@@ -537,11 +558,13 @@ export default function VerifierStaking() {
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between">
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <label className="text-[9px] text-gray-400 font-bold uppercase block">Withdrawal Request Amount</label>
+                  <label className="text-[9px] text-gray-400 font-bold uppercase block">
+                    {isSimpleMode ? 'Withdrawal Request Amount' : 'Withdrawal Request Amount'}
+                  </label>
                   <div className="group relative inline-block">
                     <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
-                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                      Specify the amount of USDC to withdraw. Locked for a 7-day cooldown period.
+                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal text-center">
+                      {isSimpleMode ? 'Specify the amount of USDC to withdraw. Locked for a 7-day safety period.' : 'Specify the amount of USDC to withdraw. Locked for a 7-day cooldown period.'}
                     </div>
                   </div>
                 </div>
@@ -559,14 +582,14 @@ export default function VerifierStaking() {
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-gray-400 px-1 font-mono">
-              <span>Your Active Stake:</span>
+              <span>{isSimpleMode ? 'Your Deposited Collateral:' : 'Your Active Stake:'}</span>
               <span>{stakedAmount ? Number(formatUnits(stakedAmount as bigint, 6)).toFixed(2) : '0.00'} USDC</span>
             </div>
 
             <button
               type="submit"
               disabled={loadingStep !== 'idle' || !stakedAmount || BigInt(stakedAmount.toString()) === 0n}
-              className="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-250 font-bold rounded-xl text-xs transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-255 font-bold rounded-xl text-xs transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loadingStep === 'requesting' ? (
                 <>
@@ -576,7 +599,7 @@ export default function VerifierStaking() {
               ) : (
                 <>
                   <Lock className="w-4 h-4 text-gray-700" />
-                  <span>Initiate Cooldown Request</span>
+                  <span>{isSimpleMode ? 'Start Withdrawal Safety Period' : 'Initiate Cooldown Request'}</span>
                 </>
               )}
             </button>
@@ -587,9 +610,9 @@ export default function VerifierStaking() {
 
       {/* 3. Global Logs / Status Prompts */}
       {errorMsg && (
-        <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs font-semibold">
-          ⚠️ {errorMsg}
-        </div>
+        <ErrorCard
+          error={errorMsg}
+        />
       )}
 
       {successMsg && (
@@ -600,7 +623,7 @@ export default function VerifierStaking() {
 
       {txHash && (
         <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between gap-4 text-xs font-mono text-gray-500">
-          <span>Transaction Hash:</span>
+          <span>{isSimpleMode ? 'Transaction ID:' : 'Transaction Hash:'}</span>
           <a
             href={explorerTxUrl(txHash)}
             target="_blank"
@@ -616,13 +639,26 @@ export default function VerifierStaking() {
       <div className="p-5 bg-cyan-50/50 border border-cyan-100/50 rounded-2xl space-y-3">
         <div className="flex items-center gap-2">
           <HelpCircle className="w-4.5 h-4.5 text-cyan-700" />
-          <h5 className="text-xs font-bold text-cyan-800 uppercase tracking-wider">Staking System FAQ</h5>
+          <h5 className="text-xs font-bold text-cyan-700 uppercase tracking-wider">
+            {isSimpleMode ? 'Security Deposit FAQ' : 'Staking System FAQ'}
+          </h5>
         </div>
         <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-cyan-900/80 font-mono">
-          <li>Accreditation validation queries `IVerifierRegistry.isActiveVerifier` on-chain.</li>
-          <li>Accrued rewards come from premium verification checks and logistics tracking audits paid by B2B buyers.</li>
-          <li>Slashing occurs in cases of fraudulent data claims, executed by the owner or multisig arbitrator council.</li>
-          <li>Slashing reduces reputation score by 50 points and sends staked USDC to the treasury/recipients.</li>
+          {isSimpleMode ? (
+            <>
+              <li>Your accreditation status is checked automatically on the registry.</li>
+              <li>Earned fees come from quality inspections paid by buyers.</li>
+              <li>Penalties are applied if false quality claims are recorded.</li>
+              <li>Penalties reduce reputation score by 50 points and return USDC back to the victims.</li>
+            </>
+          ) : (
+            <>
+              <li>Accreditation validation queries `IVerifierRegistry.isActiveVerifier` on-chain.</li>
+              <li>Accrued rewards come from premium verification checks and logistics tracking audits paid by B2B buyers.</li>
+              <li>Slashing occurs in cases of fraudulent data claims, executed by the owner or multisig arbitrator council.</li>
+              <li>Slashing reduces reputation score by 50 points and sends staked USDC to the treasury/recipients.</li>
+            </>
+          )}
         </ul>
       </div>
 

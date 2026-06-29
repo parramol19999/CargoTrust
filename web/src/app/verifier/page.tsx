@@ -6,9 +6,12 @@ import Footer from '@/components/Footer';
 import VerifierDashboard from '@/components/VerifierDashboard';
 import VerifierStaking from '@/components/VerifierStaking';
 import { Award } from 'lucide-react';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import FriendlyOnboarding from '@/components/FriendlyOnboarding';
 
 export default function VerifierPortal() {
   const [activeTab, setActiveTab] = useState<'certify' | 'staking'>('certify');
+  const { isSimpleMode } = useFriendlyMode();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f6f8fc]">
@@ -22,16 +25,21 @@ export default function VerifierPortal() {
           <div className="relative z-10 space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-150 text-gray-900 border border-gray-200 rounded-full text-xs font-mono font-bold">
               <Award className="w-3.5 h-3.5" />
-              Cryptographic Quality Verifications
+              {isSimpleMode ? 'Quality Inspection Stamp' : 'Cryptographic Quality Verifications'}
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
-              Accredited Quality Laboratory Portal
+              {isSimpleMode ? 'Quality Inspection Portal' : 'Accredited Quality Laboratory Portal'}
             </h1>
             <p className="text-sm text-gray-500 max-w-xl leading-relaxed">
-              Conduct quality inspections, lock cryptographically signed W3C Verifiable Credentials on-chain, and stake USDC collateral to back certification claims.
+              {isSimpleMode 
+                ? 'Review crop details, issue secure quality approval certificates gaslessly, and manage your safety deposit accounts.'
+                : 'Conduct quality inspections, lock cryptographically signed W3C Verifiable Credentials on-chain, and stake USDC collateral to back certification claims.'}
             </p>
           </div>
         </div>
+
+        {/* Dynamic Onboarding Explainer */}
+        <FriendlyOnboarding section="verifier" />
 
         {/* Tab Selector */}
         <div className="flex border-b border-gray-200">
@@ -43,7 +51,7 @@ export default function VerifierPortal() {
                 : 'border-transparent text-gray-400 hover:text-gray-650'
             }`}
           >
-            Quality Certifications
+            {isSimpleMode ? 'Issue Quality Approval' : 'Quality Certifications'}
           </button>
           <button
             onClick={() => setActiveTab('staking')}
@@ -53,7 +61,7 @@ export default function VerifierPortal() {
                 : 'border-transparent text-gray-400 hover:text-gray-650'
             }`}
           >
-            Staking & Collateral
+            {isSimpleMode ? 'Safety Deposit Accounts' : 'Staking & Collateral'}
           </button>
         </div>
 
@@ -63,7 +71,7 @@ export default function VerifierPortal() {
             <div className="flex items-center gap-2 px-1">
               <span className="w-1 h-4 bg-gray-900 rounded-full" />
               <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
-                Authorized Quality Accreditations
+                {isSimpleMode ? 'Unverified Coffee Shipments Awaiting Quality Review' : 'Authorized Quality Accreditations'}
               </h2>
             </div>
             <VerifierDashboard />
@@ -73,7 +81,7 @@ export default function VerifierPortal() {
             <div className="flex items-center gap-2 px-1">
               <span className="w-1 h-4 bg-gray-900 rounded-full" />
               <h2 className="text-xs font-mono tracking-widest uppercase text-gray-400 font-bold">
-                Staking, Collateral & Penalties
+                {isSimpleMode ? 'Safety Deposits & Collateral Balances' : 'Staking, Collateral & Penalties'}
               </h2>
             </div>
             <VerifierStaking />

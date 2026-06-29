@@ -5,8 +5,10 @@ import { useAccount, useReadContract, useWriteContract, usePublicClient } from '
 import { CARGO_ESCROW_ADDRESS, truncateAddress, EURC_ADDRESS, USDC_ADDRESS } from '@/lib/constants';
 import CARGO_ESCROW_ABI from '@/components/CargoEscrowABI.json';
 import { ShieldCheck, Lock, Unlock, HelpCircle, Loader2, RefreshCw, XCircle, DollarSign, Calendar, AlertTriangle } from 'lucide-react';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
 
 export default function EscrowDashboard() {
+  const { isSimpleMode } = useFriendlyMode();
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -50,9 +52,9 @@ export default function EscrowDashboard() {
           // Status enum: 0 = OPEN, 1 = FUNDED, 2 = COMPLETED, 3 = REJECTED
           let statusText = 'Unknown';
           if (status === 0) statusText = 'OPEN';
-          if (status === 1) statusText = 'IN ESCROW';
-          if (status === 2) statusText = 'PAID';
-          if (status === 3) statusText = 'REFUNDED';
+          if (status === 1) statusText = isSimpleMode ? 'SAFETY LOCKED' : 'IN ESCROW';
+          if (status === 2) statusText = isSimpleMode ? 'RELEASED' : 'PAID';
+          if (status === 3) statusText = isSimpleMode ? 'RETURNED' : 'REFUNDED';
 
           // Token Name
           let tokenName = 'USDC';
@@ -88,7 +90,7 @@ export default function EscrowDashboard() {
             amount: 250,
             expiry: Date.now() - 86400000 * 2,
             status: 2,
-            statusText: "PAID",
+            statusText: isSimpleMode ? "RELEASED" : "PAID",
             deliverableHash: "QmYyY...",
             tokenId: 1001,
             isDamaged: false,
@@ -104,7 +106,7 @@ export default function EscrowDashboard() {
             amount: 320,
             expiry: Date.now() + 86400000 * 5,
             status: 1,
-            statusText: "IN ESCROW",
+            statusText: isSimpleMode ? "SAFETY LOCKED" : "IN ESCROW",
             deliverableHash: "0x0",
             tokenId: 1004,
             isDamaged: false,
@@ -120,7 +122,7 @@ export default function EscrowDashboard() {
             amount: 180,
             expiry: Date.now() - 86400000 * 10,
             status: 3,
-            statusText: "REFUNDED",
+            statusText: isSimpleMode ? "RETURNED" : "REFUNDED",
             deliverableHash: "0x0",
             tokenId: 1003,
             isDamaged: true,
@@ -225,11 +227,13 @@ export default function EscrowDashboard() {
             <span className="w-1.5 h-5 bg-gray-900 rounded-full" />
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Lock className="w-5 h-5 text-gray-900" />
-              B2B Escrow Settlements (ERC-8183)
+              {isSimpleMode ? 'Secure Buyer-Seller Lockboxes' : 'B2B Escrow Settlements (ERC-8183)'}
             </h2>
           </div>
           <p className="text-xs text-gray-500 mt-2 max-w-xl leading-relaxed">
-            Funds are locked securely in escrow contract. Releases are triggered automatically upon verifier certifications or manually released upon cargo damage or transit delays.
+            {isSimpleMode 
+              ? 'Payments are held safely in a digital lockbox. Money is sent to the seller automatically once quality inspection passes, or returned to the buyer if crops are damaged or late.'
+              : 'Funds are locked securely in escrow contract. Releases are triggered automatically upon verifier certifications or manually released upon cargo damage or transit delays.'}
           </p>
         </div>
         <button
@@ -242,7 +246,7 @@ export default function EscrowDashboard() {
           ) : (
             <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
           )}
-          Refresh
+          {isSimpleMode ? 'Refresh List' : 'Refresh'}
         </button>
       </div>
 
@@ -263,7 +267,9 @@ export default function EscrowDashboard() {
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
         <div className="bg-[#fcfdfe] border border-gray-200 rounded-2xl p-5 relative overflow-hidden">
-          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">USDC In Escrow</div>
+          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">
+            {isSimpleMode ? 'USDC Securely Locked' : 'USDC In Escrow'}
+          </div>
           <div className="text-2xl font-extrabold text-gray-900 mt-1.5 flex items-baseline gap-1">
             {totalLockedUSDC.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             <span className="text-xs font-bold text-emerald-600">USDC</span>
@@ -274,7 +280,9 @@ export default function EscrowDashboard() {
         </div>
 
         <div className="bg-[#fcfdfe] border border-gray-200 rounded-2xl p-5 relative overflow-hidden">
-          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">EURC In Escrow</div>
+          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">
+            {isSimpleMode ? 'EURC Securely Locked' : 'EURC In Escrow'}
+          </div>
           <div className="text-2xl font-extrabold text-gray-900 mt-1.5 flex items-baseline gap-1">
             {totalLockedEURC.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             <span className="text-xs font-bold text-cyan-600">EURC</span>
@@ -285,10 +293,12 @@ export default function EscrowDashboard() {
         </div>
 
         <div className="bg-[#fcfdfe] border border-gray-200 rounded-2xl p-5 relative overflow-hidden">
-          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">Your Active Share</div>
+          <div className="text-[10px] font-mono tracking-wider font-bold text-gray-400 uppercase">
+            {isSimpleMode ? 'Your Active Orders' : 'Your Active Share'}
+          </div>
           <div className="text-2xl font-extrabold text-gray-900 mt-1.5 flex items-baseline gap-1">
             {yourEscrowVolume.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            <span className="text-xs font-bold text-slate-500">Value</span>
+            <span className="text-xs font-bold text-slate-500">{isSimpleMode ? 'Value' : 'Value'}</span>
           </div>
           <div className="absolute right-4 bottom-3 bg-purple-50 p-2 rounded-xl border border-purple-100">
             <Unlock className="w-5 h-5 text-purple-600" />
@@ -300,14 +310,20 @@ export default function EscrowDashboard() {
       {loading && jobs.length === 0 ? (
         <div className="py-12 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-3" />
-          <p className="text-xs text-gray-500 font-medium">Reading ERC-8183 smart contract jobs...</p>
+          <p className="text-xs text-gray-500 font-medium">
+            {isSimpleMode ? 'Checking active safety lockboxes...' : 'Reading ERC-8183 smart contract jobs...'}
+          </p>
         </div>
       ) : jobs.length === 0 ? (
         <div className="py-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
           <HelpCircle className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-gray-800">No Escrow Agreements</h3>
+          <h3 className="text-sm font-semibold text-gray-800">
+            {isSimpleMode ? 'No active lockboxes' : 'No Escrow Agreements'}
+          </h3>
           <p className="text-xs text-gray-500 max-w-xs mx-auto mt-1 leading-relaxed">
-            Locked escrow jobs appear automatically when crops are purchased on the platform.
+            {isSimpleMode 
+              ? 'Your safety lockbox agreements will show up here when you make or receive a payment.'
+              : 'Locked escrow jobs appear automatically when crops are purchased on the platform.'}
           </p>
         </div>
       ) : (
@@ -327,10 +343,10 @@ export default function EscrowDashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                   <div className="flex items-center gap-2.5">
                     <span className="bg-gray-100 text-gray-800 border border-gray-200 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold">
-                      Job #{job.id}
+                      {isSimpleMode ? `Agreement #${job.id}` : `Job #${job.id}`}
                     </span>
                     <span className="text-gray-400 font-mono text-[10px] font-semibold">
-                      Crop Batch ID: {job.tokenId}
+                      {isSimpleMode ? `Batch Receipt ID: ${job.tokenId}` : `Crop Batch ID: ${job.tokenId}`}
                     </span>
                   </div>
 
@@ -338,7 +354,7 @@ export default function EscrowDashboard() {
                     {job.isDamaged && (
                       <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        Damaged
+                        {isSimpleMode ? 'Damaged' : 'Damaged'}
                       </span>
                     )}
                     <span
@@ -361,19 +377,19 @@ export default function EscrowDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="space-y-1.5 md:col-span-2">
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-400 w-24">Buyer (Client):</span>
+                      <span className="text-gray-400 w-24">{isSimpleMode ? 'Buyer:' : 'Buyer (Client):'}</span>
                       <span className="font-mono text-gray-800 font-semibold">
                         {truncateAddress(job.client)} {isBuyer && '(You)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-400 w-24">Seller (Provider):</span>
+                      <span className="text-gray-400 w-24">{isSimpleMode ? 'Seller:' : 'Seller (Provider):'}</span>
                       <span className="font-mono text-gray-800 font-semibold">
                         {truncateAddress(job.provider)} {isSeller && '(You)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-400 w-24">Certifier:</span>
+                      <span className="text-gray-400 w-24">{isSimpleMode ? 'Inspector:' : 'Certifier:'}</span>
                       <span className="font-mono text-gray-800 font-semibold">
                         {truncateAddress(job.evaluator)} {isEvaluator && '(You)'}
                       </span>
@@ -382,7 +398,7 @@ export default function EscrowDashboard() {
 
                   <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 flex flex-col justify-center">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500 font-medium">Locked:</span>
+                      <span className="text-gray-500 font-medium">{isSimpleMode ? 'Locked Payment:' : 'Locked:'}</span>
                       <span className="font-extrabold text-gray-900">
                         {job.amount.toLocaleString()} {job.tokenName}
                       </span>
@@ -390,7 +406,7 @@ export default function EscrowDashboard() {
                     <div className="flex justify-between items-center text-[10px] mt-1.5">
                       <span className="text-gray-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        Deadline:
+                        {isSimpleMode ? 'Delivery Date:' : 'Deadline:'}
                       </span>
                       <span className={`font-semibold ${isPastExpiry && job.status === 1 ? 'text-rose-600' : 'text-gray-600'}`}>
                         {new Date(job.expiry).toLocaleDateString()}
@@ -405,19 +421,19 @@ export default function EscrowDashboard() {
                   if (job.isDamaged) {
                     eligibilityBadge = (
                       <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
-                        ✓ Refundable: Cargo Damaged
+                        {isSimpleMode ? '✓ Eligible for Refund: Crops Damaged' : '✓ Refundable: Cargo Damaged'}
                       </span>
                     );
                   } else if (isPastExpiry) {
                     eligibilityBadge = (
                       <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
-                        ✓ Refundable: Deadline Passed
+                        {isSimpleMode ? '✓ Eligible for Refund: Time Expired' : '✓ Refundable: Deadline Passed'}
                       </span>
                     );
                   } else if (isSeller) {
                     eligibilityBadge = (
                       <span className="bg-cyan-50 text-cyan-700 border border-cyan-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
-                        ✓ Seller Release Eligible
+                        {isSimpleMode ? '✓ Ready for Payout' : '✓ Seller Release Eligible'}
                       </span>
                     );
                   } else {
@@ -425,7 +441,9 @@ export default function EscrowDashboard() {
                     const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
                     eligibilityBadge = (
                       <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
-                        🔒 Locked: Expires in {daysLeft > 0 ? daysLeft : 0}d
+                        {isSimpleMode 
+                          ? `🔒 Locked: Delivery due in ${daysLeft > 0 ? daysLeft : 0} days` 
+                          : `🔒 Locked: Expires in ${daysLeft > 0 ? daysLeft : 0}d`}
                       </span>
                     );
                   }
@@ -436,8 +454,8 @@ export default function EscrowDashboard() {
                         {eligibilityBadge}
                         <span className="text-[10px] text-gray-400">
                           {isEvaluator
-                            ? 'Confirm crop quality specs and release payout to seller.'
-                            : 'Awaiting lab QA report certification to release escrow payout.'}
+                            ? (isSimpleMode ? 'Approve crop quality to send payment to the seller.' : 'Confirm crop quality specs and release payout to seller.')
+                            : (isSimpleMode ? 'Waiting for the laboratory report to unlock the payment.' : 'Awaiting lab QA report certification to release escrow payout.')}
                         </span>
                       </div>
 
@@ -453,7 +471,7 @@ export default function EscrowDashboard() {
                             ) : (
                               <ShieldCheck className="w-3.5 h-3.5" />
                             )}
-                            Release Escrow
+                            {isSimpleMode ? 'Approve & Release Payment' : 'Release Escrow'}
                           </button>
                         )}
 
@@ -463,12 +481,12 @@ export default function EscrowDashboard() {
                             disabled={actionLoadingId !== null || (!job.isDamaged && !isPastExpiry && !isSeller && !isEvaluator)}
                             title={
                               job.isDamaged
-                                ? "Refund is active because cargo is marked Damaged."
+                                ? (isSimpleMode ? 'Refund is active because crops are marked Damaged.' : "Refund is active because cargo is marked Damaged.")
                                 : isPastExpiry
-                                ? "Refund is active because the delivery deadline has passed."
+                                ? (isSimpleMode ? 'Refund is active because the delivery deadline has passed.' : "Refund is active because the delivery deadline has passed.")
                                 : isSeller
-                                ? "Seller can voluntarily refund client."
-                                : "Refund locked until deadline expires or cargo is marked Damaged."
+                                ? (isSimpleMode ? 'Seller can voluntarily return money to buyer.' : "Seller can voluntarily refund client.")
+                                : (isSimpleMode ? 'Refund locked until deadline expires or crops are marked Damaged.' : "Refund locked until deadline expires or cargo is marked Damaged.")
                             }
                             className="bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-100 text-gray-600 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-gray-600 disabled:hover:border-gray-200 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition duration-200"
                           >
@@ -477,7 +495,7 @@ export default function EscrowDashboard() {
                             ) : (
                               <XCircle className="w-3.5 h-3.5" />
                             )}
-                            Claim Refund
+                            {isSimpleMode ? 'Cancel & Refund' : 'Claim Refund'}
                           </button>
                         )}
                       </div>

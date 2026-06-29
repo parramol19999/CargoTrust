@@ -6,14 +6,17 @@ import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI } from '@/lib/constants'
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { Leaf, MapPin, Calendar, Compass, FileText, Loader2, ArrowRight, ArrowLeftRight, HelpCircle } from 'lucide-react';
 import { formatUnits } from 'viem';
+import ErrorCard from '@/components/ErrorCard';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
 
 export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => void }) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const { isSponsored, limitReached } = useGasSponsorship();
+  const { isSimpleMode } = useFriendlyMode();
 
   // Segment State (Inspire by Flight/Hotel tabs)
   const [activeSegment, setActiveSegment] = useState<'registry' | 'standards' | 'logistics'>('registry');
@@ -67,8 +70,8 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
     setDestLatLong(tempLat);
   };
 
-  const handleMint = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMint = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address) {
       setErrorMsg('Please connect your Web3 wallet first.');
       return;
@@ -213,7 +216,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           }`}
         >
           <Leaf className="w-4 h-4" />
-          Crop Registry
+          {isSimpleMode ? 'Digital Crop Receipt' : 'Crop Registry'}
         </button>
         <button
           type="button"
@@ -223,7 +226,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           }`}
         >
           <FileText className="w-4 h-4" />
-          Certifications
+          {isSimpleMode ? 'Quality Certificates' : 'Certifications'}
         </button>
       </div>
 
@@ -232,31 +235,37 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           <div className="p-4 bg-emerald-50 rounded-full border border-emerald-100 mb-4">
             <Leaf className="w-12 h-12 text-emerald-600 animate-pulse" />
           </div>
-          <h4 className="text-lg font-bold text-gray-900">Digital Twin Registered</h4>
+          <h4 className="text-lg font-bold text-gray-900">
+            {isSimpleMode ? 'Digital Crop Receipt Registered ✓' : 'Digital Twin Registered'}
+          </h4>
           <p className="text-xs text-gray-500 max-w-sm mt-2">
-            The batch has been assigned an immutable identity NFT and anchors origin credentials on the blockchain.
+            {isSimpleMode 
+              ? 'Your crop batch now has a secure digital receipt showing origin details permanently.'
+              : 'The batch has been assigned an immutable identity NFT and anchors origin credentials on the blockchain.'}
           </p>
 
           <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 w-full max-w-md mt-6 text-left text-xs font-mono text-gray-600">
             <div className="flex justify-between mb-1.5">
-              <span>Token Standard:</span>
-              <span className="text-gray-950 font-bold">ERC-721 (CRGO)</span>
+              <span>{isSimpleMode ? 'Receipt Type:' : 'Token Standard:'}</span>
+              <span className="text-gray-950 font-bold">
+                {isSimpleMode ? 'Secure Digital Receipt' : 'ERC-721 (CRGO)'}
+              </span>
             </div>
             <div className="flex justify-between mb-1.5">
-              <span>Mint Fee Paid:</span>
+              <span>{isSimpleMode ? 'Creation Fee Paid:' : 'Mint Fee Paid:'}</span>
               <span className="text-gray-950 font-bold">0.10 USDC</span>
             </div>
             {isSponsored && (
               <div className="flex justify-between mb-1.5 font-mono text-cyan-600 font-bold">
-                <span>Gas Status:</span>
-                <span className="px-2 py-0.5 bg-cyan-50 border border-cyan-150 rounded text-[10px] flex items-center gap-1">
+                <span>{isSimpleMode ? 'Network Fees:' : 'Gas Status:'}</span>
+                <span className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded text-[10px] flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-ping" />
-                  Gas Sponsored
+                  {isSimpleMode ? 'Covered by Platform' : 'Gas Sponsored'}
                 </span>
               </div>
             )}
             <div className="flex justify-between mt-3 pt-3 border-t border-gray-200">
-              <span>Tx Hash:</span>
+              <span>{isSimpleMode ? 'Receipt Link:' : 'Tx Hash:'}</span>
               <a
                 href={`https://testnet.arcscan.app/tx/${txHash}`}
                 target="_blank"
@@ -275,7 +284,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
             }}
             className="mt-6 px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition-all duration-300"
           >
-            Create Another Batch
+            {isSimpleMode ? 'Register Another Coffee Batch' : 'Create Another Batch'}
           </button>
         </div>
       ) : (
@@ -287,12 +296,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-gray-400" />
-                  FROM (Origin Farm)
+                  {isSimpleMode ? 'Starting Point (Origin Farm)' : 'FROM (Origin Farm)'}
                 </span>
                 <div className="group relative inline-block">
                   <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                    Enter the name and geographic coordinates of the origin farm where the crop was harvested.
+                    {isSimpleMode ? 'Specify the address or farm name where this coffee was grown and harvested.' : 'Enter the name and geographic coordinates of the origin farm where the crop was harvested.'}
                   </div>
                 </div>
               </div>
@@ -328,12 +337,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                   <Compass className="w-3 h-3 text-gray-400" />
-                  TO (QA Lab Destination)
+                  {isSimpleMode ? 'Destination (Quality Testing Lab)' : 'TO (QA Lab Destination)'}
                 </span>
                 <div className="group relative inline-block">
                   <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                    Enter the name and geographic coordinates of the quality testing lab or destination warehouse.
+                    {isSimpleMode ? 'Specify the destination laboratory or warehouse where the coffee shipment is being sent.' : 'Enter the name and geographic coordinates of the quality testing lab or destination warehouse.'}
                   </div>
                 </div>
               </div>
@@ -361,7 +370,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-gray-400" />
-                  Date of Harvest
+                  {isSimpleMode ? 'Harvest Date' : 'Date of Harvest'}
                 </span>
                 <div className="group relative inline-block">
                   <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
@@ -383,12 +392,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                   <FileText className="w-3 h-3 text-gray-400" />
-                  Certificates URI (IPFS)
+                  {isSimpleMode ? 'Quality Documents Link' : 'Certificates URI (IPFS)'}
                 </span>
                 <div className="group relative inline-block">
                   <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                    Enter the IPFS URI pointing to relevant lab and agricultural documents.
+                    {isSimpleMode ? 'Provide a link to quality certs or documentation stored on public databases.' : 'Enter the IPFS URI pointing to relevant lab and agricultural documents.'}
                   </div>
                 </div>
               </div>
@@ -407,7 +416,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl">
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Crop Batch Description & Grade Specifications
+                {isSimpleMode ? 'Coffee description and grade details' : 'Crop Batch Description & Grade Specifications'}
               </span>
               <div className="group relative inline-block">
                 <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
@@ -431,10 +440,12 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
             <div className="flex items-center justify-between">
               <div>
                 <span className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
-                  Opt-In Metadata Privacy
+                  {isSimpleMode ? 'Protect Farm Privacy' : 'Opt-In Metadata Privacy'}
                 </span>
                 <span className="block text-[10px] text-gray-400 mt-0.5">
-                  Encrypt origin, coordinates, and price values client-side prior to minting on Arc
+                  {isSimpleMode 
+                    ? 'Hide origin farm location and private price targets from the public'
+                    : 'Encrypt origin, coordinates, and price values client-side prior to minting on Arc'}
                 </span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -453,7 +464,7 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Private Target Price (USDC / EURC Value)
+                      {isSimpleMode ? 'Secret Minimum Sale Price (in Digital Dollars)' : 'Private Target Price (USDC / EURC Value)'}
                     </label>
                     <div className="group relative inline-block">
                       <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
@@ -477,24 +488,27 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           {/* Account USDC Status bar */}
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs text-gray-500 font-mono">
             <span>
-              Balance:{' '}
+              {isSimpleMode ? 'Your Digital Cash Balance:' : 'Balance:'}{' '}
               <strong className="text-gray-900">
                 {usdcBalance ? parseFloat(formatUnits(BigInt(usdcBalance.toString()), 6)).toFixed(2) : '0.00'}{' '}
                 USDC
               </strong>
             </span>
             <span>
-              Pre-approval Status:{' '}
+              {isSimpleMode ? 'Wallet Access Approval:' : 'Pre-approval Status:'}{' '}
               <strong className="text-emerald-600">
-                {usdcAllowance && BigInt(usdcAllowance.toString()) >= MINT_FEE ? 'Approved ✓' : 'Required'}
+                {usdcAllowance && BigInt(usdcAllowance.toString()) >= MINT_FEE 
+                  ? (isSimpleMode ? 'Ready ✓' : 'Approved ✓') 
+                  : (isSimpleMode ? 'Requires Action' : 'Required')}
               </strong>
             </span>
           </div>
 
           {errorMsg && (
-            <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold font-mono">
-              ⚠️ {errorMsg}
-            </div>
+            <ErrorCard
+              error={errorMsg}
+              onRetry={() => handleMint()}
+            />
           )}
 
           {limitReached && (
@@ -507,7 +521,9 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
           <div className="relative pt-4 flex justify-end">
             {!isConnected ? (
               <div className="w-full p-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-center text-xs text-gray-500 font-medium">
-                Please connect your wallet at the navbar to mint crop twins.
+                {isSimpleMode 
+                  ? 'Please connect your wallet in the top bar to create a crop receipt.'
+                  : 'Please connect your wallet at the navbar to mint crop twins.'}
               </div>
             ) : (
               <button
@@ -518,29 +534,31 @@ export default function TwinCreator({ onMintSuccess }: { onMintSuccess?: () => v
                 {loadingStep === 'encrypting' && (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Encrypting payload...
+                    {isSimpleMode ? 'Securing information...' : 'Encrypting payload...'}
                   </span>
                 )}
                 {loadingStep === 'approving' && (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Approving USDC...
+                    {isSimpleMode ? 'Approving fee...' : 'Approving USDC...'}
                   </span>
                 )}
                 {loadingStep === 'minting' && (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Minting twin...
+                    {isSimpleMode ? 'Creating digital receipt...' : 'Registering coffee...'}
                   </span>
                 )}
                 {loadingStep === 'idle' && (
                   <>
                     <span className="flex items-center gap-2.5">
-                      Mint Product Twin (0.10 USDC Fee)
+                      {isSimpleMode ? 'Create Digital Receipt (Cost: $0.10)' : 'Mint Product Twin (0.10 USDC Fee)'}
                       <ArrowRight className="w-4 h-4 text-white" />
                     </span>
                     <span className="text-[10px] text-cyan-300 font-mono tracking-normal normal-case font-medium mt-0.5">
-                      {isSponsored ? 'Gas Fee: $0.00 (Sponsored)' : 'Gas Fee: Paid by User'}
+                      {isSponsored 
+                        ? (isSimpleMode ? 'Network Fees: Covered by platform ($0.00)' : 'Gas Fee: $0.00 (Sponsored)') 
+                        : (isSimpleMode ? 'Network Fees: Paid by user' : 'Gas Fee: Paid by User')}
                     </span>
                   </>
                 )}

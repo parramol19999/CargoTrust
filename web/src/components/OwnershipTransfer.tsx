@@ -10,12 +10,15 @@ import { formatUnits, parseUnits } from 'viem';
 import { useGasSponsorship } from '@/lib/gasSponsor';
 import CrossChainPurchaseModal from '@/components/CrossChainPurchaseModal';
 import BatchSplitter from '@/components/BatchSplitter';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?: number }) {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const { isSponsored, limitReached } = useGasSponsorship();
+  const { isSimpleMode } = useFriendlyMode();
 
   // Cross-chain purchase state
   const [crossChainModalOpen, setCrossChainModalOpen] = useState(false);
@@ -27,6 +30,7 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
 
   // On-chain Data State
   const [batches, setBatches] = useState<any[]>([]);
+  const [decryptedBatches, setDecryptedBatches] = useState<{ [id: number]: { origin: string; description: string; latLong: string; price?: string } }>({});
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -81,6 +85,9 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                   isForSale
                   status
                   weight
+                  isEncrypted
+                  encryptedPrice
+                  isDemo
                 }
               }
             `
@@ -109,7 +116,10 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
             status: twin.status,
             owner: twin.owner,
             paymentToken: USDC_ADDRESS,
-            weight: BigInt(twin.weight || 100)
+            weight: BigInt(twin.weight || 100),
+            isEncrypted: !!twin.isEncrypted,
+            encryptedPrice: twin.encryptedPrice || '',
+            isDemo: !!twin.isDemo
           };
         });
 
@@ -124,6 +134,47 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
 
     loadAllBatches();
   }, [publicClient, nextTokenId, refreshKey, refreshTrigger]);
+
+  // Automatic Decryption Loop
+  useEffect(() => {
+    async function decryptAll() {
+      batches.forEach(async (batch) => {
+        if (!batch.isEncrypted) return;
+        if (decryptedBatches[batch.id]) return;
+
+        try {
+          const decryptRes = await fetch('/api/privacy/decrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokenId: batch.id,
+              requester: address || batch.producer,
+              producer: batch.producer,
+              encryptedData: {
+                origin: batch.origin,
+                latLong: batch.latLong,
+                description: batch.description,
+                price: batch.encryptedPrice || '',
+              }
+            }),
+          });
+          const decVal = await decryptRes.json();
+          if (decVal.success) {
+            setDecryptedBatches((prev) => ({
+              ...prev,
+              [batch.id]: decVal.decrypted
+            }));
+          }
+        } catch (decErr) {
+          console.error('Auto decryption failed for batch #' + batch.id, decErr);
+        }
+      });
+    }
+
+    if (batches.length > 0) {
+      decryptAll();
+    }
+  }, [batches, address]);
 
   // StableFX Quote fetch trigger
   const fetchStableFXQuote = async (
@@ -340,8 +391,12 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
             <ShoppingCart className="w-5 h-5 text-gray-900" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-gray-900">B2B Financialized Operations Desk</h3>
-            <p className="text-xs text-gray-400">StableFX Cross-Token Conversions & ownership routing</p>
+            <h3 className="text-base font-bold text-gray-900">
+              {isSimpleMode ? 'Trade & Escrow Payments Desk' : 'B2B Financialized Operations Desk'}
+            </h3>
+            <p className="text-xs text-gray-400">
+              {isSimpleMode ? 'Pay with USDC/EURC stablecoins with automatic cross-currency exchange' : 'StableFX Cross-Token Conversions & ownership routing'}
+            </p>
           </div>
         </div>
 
@@ -355,27 +410,33 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
       </div>
 
       {errorMsg && (
-        <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold mb-4 animate-pulse">
-          ⚠️ {errorMsg}
+        <div className="mb-4">
+          <ErrorCard
+            error={errorMsg}
+          />
         </div>
       )}
 
       {limitReached && (
         <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-medium font-sans mb-4">
-          ⚠️ Gas sponsorship limits reached. B2B operations will require native USDC gas.
+          {isSimpleMode ? '⚠️ Free transaction network limit reached. Transactions will require your own USDC for fees.' : '⚠️ Gas sponsorship limits reached. B2B operations will require native USDC gas.'}
         </div>
       )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Loader2 className="w-8 h-8 text-gray-900 animate-spin mb-3" />
-          <p className="text-xs font-mono text-gray-400">Reading block state from Arc Testnet...</p>
+          <p className="text-xs font-mono text-gray-400">
+            {isSimpleMode ? 'Reading coffee database...' : 'Reading block state from Arc Testnet...'}
+          </p>
         </div>
       ) : batches.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed border-gray-200 rounded-3xl text-gray-400 text-center">
           <Layers className="w-10 h-10 text-gray-300 mb-2" />
-          <p className="text-sm font-semibold">No batches minted on-chain yet.</p>
-          <p className="text-xs text-gray-400 max-w-xs mt-1">Use the Twin Creator to initiate the first batch.</p>
+          <p className="text-sm font-semibold">{isSimpleMode ? 'No coffee batches registered yet.' : 'No batches minted on-chain yet.'}</p>
+          <p className="text-xs text-gray-400 max-w-xs mt-1">
+            {isSimpleMode ? 'Use the "Trade & Provenance Desk" tab to register your first harvest.' : 'Use the Twin Creator to initiate the first batch.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -395,7 +456,7 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200/50 rounded-lg text-[10px] font-mono font-bold tracking-wider">
-                      BATCH: #{batch.id}
+                      {isSimpleMode ? `BATCH ID: #${batch.id}` : `BATCH: #${batch.id}`}
                     </span>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
@@ -404,32 +465,62 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                           : 'bg-gray-50 text-gray-500 border border-gray-200/60'
                       }`}
                     >
-                      {batch.isForSale ? `Listed in ${listedCurr}` : 'Held under Custody'}
+                      {batch.isForSale 
+                        ? (isSimpleMode ? `For Sale in ${listedCurr}` : `Listed in ${listedCurr}`) 
+                        : (isSimpleMode ? 'Not for Sale (Stored)' : 'Held under Custody')}
                     </span>
                   </div>
 
-                  <h4 className="text-base font-bold text-gray-900">{batch.origin}</h4>
-                  <p className="text-xs text-gray-500 mt-1">{batch.description}</p>
+                  <h4 className="text-base font-bold text-gray-900">
+                    {batch.isEncrypted && !decryptedBatches[batch.id] ? (
+                      <span className="text-gray-400 font-bold flex items-center gap-1 text-sm">
+                        🔒 {isSimpleMode ? 'Private Origin (Encrypted)' : 'Encrypted Origin'}
+                      </span>
+                    ) : (
+                      decryptedBatches[batch.id]?.origin || batch.origin
+                    )}
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {batch.isEncrypted && !decryptedBatches[batch.id] ? (
+                      <span className="text-gray-400 text-xs italic flex items-center gap-1">
+                        🔒 {isSimpleMode ? 'Batch details are encrypted & locked' : 'Details stored privately (AES-256)'}
+                      </span>
+                    ) : (
+                      decryptedBatches[batch.id]?.description || batch.description
+                    )}
+                  </p>
 
                   <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100 text-xs font-medium">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Custodian</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                        {isSimpleMode ? 'Current Owner' : 'Custodian'}
+                      </span>
                       <span className="text-gray-900 font-mono">
-                        {isOwner ? 'You (Owner)' : truncateAddress(batch.owner, 4)}
+                        {isOwner ? (isSimpleMode ? 'You' : 'You (Owner)') : truncateAddress(batch.owner, 4)}
                       </span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Harvest Date</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                        {isSimpleMode ? 'Harvest Date' : 'Harvest Date'}
+                      </span>
                       <span className="text-gray-955 flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
                         {new Date(batch.harvestDate).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex flex-col col-span-2">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5 font-mono">Status & GPS Coordinates</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5 font-mono">
+                        {isSimpleMode ? 'Farm GPS & Lab Quality Status' : 'Status & GPS Coordinates'}
+                      </span>
                       <span className="text-gray-900 font-bold flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                        {batch.latLong} • <span className="text-cyan-600 font-mono text-[11px]">{batch.status}</span>
+                        {batch.isEncrypted && !decryptedBatches[batch.id] ? (
+                          <span className="text-gray-400 font-mono text-[11px] flex items-center gap-1">
+                            🔒 {isSimpleMode ? 'Coordinates Hidden' : 'Redacted GPS'}
+                          </span>
+                        ) : (
+                          `${decryptedBatches[batch.id]?.latLong || batch.latLong}`
+                        )} • <span className="text-cyan-600 font-mono text-[11px]">{batch.status}</span>
                       </span>
                     </div>
                   </div>
@@ -441,21 +532,29 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
                           <span className="text-[10px] text-gray-400 uppercase block tracking-widest font-bold">
-                            B2B Price
+                            {isSimpleMode ? 'Purchase Price' : 'B2B Price'}
                           </span>
                           <span className="text-lg font-bold text-emerald-600">
-                            {parseFloat(formatUnits(batch.priceUsdc, 6)).toLocaleString()} {listedCurr}
+                            {batch.isEncrypted && !decryptedBatches[batch.id] ? (
+                              <span className="text-xs text-gray-400 italic flex items-center gap-1">
+                                🔒 {isSimpleMode ? 'Price Sealed' : 'Price Redacted'}
+                              </span>
+                            ) : (
+                              batch.isEncrypted && decryptedBatches[batch.id]
+                                ? `${parseFloat(decryptedBatches[batch.id].price || '0').toLocaleString()} ${listedCurr}`
+                                : `${parseFloat(formatUnits(batch.priceUsdc, 6)).toLocaleString()} ${listedCurr}`
+                            )}
                           </span>
                         </div>
 
                         {!isOwner && (
                           <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 text-xs font-semibold">
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-500">Pay With:</span>
+                              <span className="text-gray-500">{isSimpleMode ? 'Pay using:' : 'Pay With:'}</span>
                               <div className="group relative inline-block">
                                 <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                                 <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                                  Select stablecoin to pay. StableFX executes an atomic swap if it differs from listed currency.
+                                  {isSimpleMode ? 'Select digital currency to pay. If it is different, the system will swap it automatically.' : 'Select stablecoin to pay. StableFX executes an atomic swap if it differs from listed currency.'}
                                 </div>
                               </div>
                             </div>
@@ -478,11 +577,11 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                         <div className="p-4 bg-emerald-50/30 border border-emerald-100/50 rounded-2xl space-y-3">
                           <div className="flex justify-between items-center text-xs">
                             <div className="flex items-center gap-1">
-                              <span className="text-gray-500 font-medium">Slippage Limit:</span>
+                              <span className="text-gray-500 font-medium">{isSimpleMode ? 'Price Safeguard:' : 'Slippage Limit:'}</span>
                               <div className="group relative inline-block">
                                 <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                                 <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                                  Maximum swap slippage percentage tolerated for live StableFX conversion.
+                                  {isSimpleMode ? 'Allowed price difference during payment.' : 'Maximum swap slippage percentage tolerated for live StableFX conversion.'}
                                 </div>
                               </div>
                             </div>
@@ -500,16 +599,16 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                           {isQuoteLoading ? (
                             <div className="flex items-center justify-center py-2 text-emerald-700 font-mono text-xs">
                               <Loader2 className="w-4 h-4 animate-spin mr-1.5 text-emerald-600" />
-                              Fetching StableFX Live rate...
+                              {isSimpleMode ? 'Calculating exchange rate...' : 'Fetching StableFX Live rate...'}
                             </div>
                           ) : quote ? (
                             <div className="text-xs space-y-2">
                               <div className="flex justify-between font-mono">
-                                <span className="text-gray-400">Conversion Rate:</span>
+                                <span className="text-gray-400">{isSimpleMode ? 'Exchange Rate:' : 'Conversion Rate:'}</span>
                                 <span className="text-gray-900 font-bold">1 EURC ≈ {quote.rate.toFixed(4)} USDC</span>
                               </div>
                               <div className="flex justify-between font-mono">
-                                <span className="text-gray-400">Total Charged:</span>
+                                <span className="text-gray-400">{isSimpleMode ? 'Total to Pay:' : 'Total Charged:'}</span>
                                 <span className="text-emerald-700 font-extrabold text-sm">{quote.paymentAmount} EURC</span>
                               </div>
                               <div className="flex justify-between text-[10px] text-gray-400 font-mono">
@@ -517,7 +616,7 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                                 <span>{new Date(quote.deadline * 1000).toLocaleTimeString()}</span>
                               </div>
                               <div className="inline-flex items-center gap-1 bg-emerald-100/60 text-emerald-800 border border-emerald-200/50 rounded-lg px-2 py-1 text-[9px] font-bold font-mono">
-                                🛡️ Rate Slippage Protected & Signed
+                                {isSimpleMode ? '🛡️ Price Protected & Certified' : '🛡️ Rate Slippage Protected & Signed'}
                               </div>
                             </div>
                           ) : (
@@ -530,13 +629,15 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
 
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
                         {isOwner ? (
-                          <span className="text-xs text-gray-400 font-bold italic font-mono pr-2">Your listing</span>
+                          <span className="text-xs text-gray-400 font-bold italic font-mono pr-2">
+                            {isSimpleMode ? 'Your sale listing' : 'Your listing'}
+                          </span>
                         ) : (
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                             <button
                               onClick={() => handleBuy(batch.id, batch)}
-                              disabled={isLoading || (selectedPayCurr !== listedCurr && !quotes[batch.id] && !isQuoteLoading)}
-                              className="px-5 py-2.5 bg-gray-950 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow min-w-[140px]"
+                              disabled={isLoading || batch.isDemo || (selectedPayCurr !== listedCurr && !quotes[batch.id] && !isQuoteLoading)}
+                              className="px-5 py-2.5 bg-gray-950 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isLoading ? (
                                 <span className="flex items-center gap-1.5 font-mono">
@@ -546,11 +647,19 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                               ) : (
                                 <>
                                   <span className="flex items-center gap-1">
-                                    {selectedPayCurr !== listedCurr ? 'Settle with StableFX' : 'Purchase Cargo'}
+                                    {batch.isDemo ? 'Demo Only' : (
+                                      selectedPayCurr !== listedCurr 
+                                        ? (isSimpleMode ? 'Convert & Buy Cargo' : 'Settle with StableFX') 
+                                        : (isSimpleMode ? 'Buy Cargo' : 'Purchase Cargo')
+                                    )}
                                     <ChevronRight className="w-3.5 h-3.5" />
                                   </span>
                                   <span className="text-[9px] text-cyan-300 font-mono tracking-normal normal-case font-medium">
-                                    {isSponsored ? 'Gas Sponsored' : 'User Pays Gas'}
+                                    {batch.isDemo ? 'Cannot buy on-chain' : (
+                                      isSponsored 
+                                        ? (isSimpleMode ? 'Network Fees: Free' : 'Gas Sponsored') 
+                                        : (isSimpleMode ? 'Network Fees: Paid by user' : 'User Pays Gas')
+                                    )}
                                   </span>
                                 </>
                               )}
@@ -561,14 +670,14 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                                 setSelectedCrossChainBatch(batch);
                                 setCrossChainModalOpen(true);
                               }}
-                              disabled={isLoading}
-                              className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-950 border border-gray-205 rounded-xl text-xs font-bold transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow-sm min-w-[140px]"
+                              disabled={isLoading || batch.isDemo}
+                              className="px-5 py-2.5 bg-white hover:bg-gray-50 text-gray-950 border border-gray-255 rounded-xl text-xs font-bold transition-all duration-300 flex flex-col items-center justify-center gap-0.5 shadow-sm min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <span className="flex items-center gap-1">
-                                Buy with Base/Eth
+                                {isSimpleMode ? 'Buy from Other Chains' : 'Buy with Base/Eth'}
                               </span>
                               <span className="text-[9px] text-emerald-600 font-mono tracking-normal normal-case font-medium">
-                                USDC Bridge
+                                {batch.isDemo ? 'Demo Only' : (isSimpleMode ? 'Safe Bridge Transfer' : 'USDC Bridge')}
                               </span>
                             </button>
                           </div>
@@ -583,11 +692,13 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                             <div className="grid grid-cols-2 gap-2">
                               <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Set Price</span>
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                                    {isSimpleMode ? 'List Price' : 'Set Price'}
+                                  </span>
                                   <div className="group relative inline-block">
                                     <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                                     <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                                      Define the wholesale listing price for this agricultural batch.
+                                      {isSimpleMode ? 'Enter the price you want to sell this coffee batch for.' : 'Define the wholesale listing price for this agricultural batch.'}
                                     </div>
                                   </div>
                                 </div>
@@ -601,11 +712,13 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                               </div>
                               <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
                                 <div className="flex items-center gap-1 mb-1">
-                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Currency</span>
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                                    {isSimpleMode ? 'Payment Type' : 'Currency'}
+                                  </span>
                                   <div className="group relative inline-block">
                                     <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                                     <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                                      Select listing stablecoin denomination (USDC / EURC).
+                                      {isSimpleMode ? 'Choose between digital dollars (USDC) or digital euros (EURC).' : 'Select listing stablecoin denomination (USDC / EURC).'}
                                     </div>
                                   </div>
                                 </div>
@@ -625,9 +738,11 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                                 disabled={isLoading}
                                 className="flex-grow py-2 bg-gray-950 hover:bg-gray-900 text-white font-bold rounded-xl text-xs flex flex-col items-center justify-center gap-0.5"
                               >
-                                <span>{isLoading ? 'Listing...' : 'List Batches'}</span>
+                                <span>{isLoading ? 'Listing...' : (isSimpleMode ? 'Lock price & Put up for sale' : 'List Batches')}</span>
                                 {isSponsored && !isLoading && (
-                                  <span className="text-[9px] text-cyan-300 font-mono tracking-normal normal-case font-medium">Gas Sponsored</span>
+                                  <span className="text-[9px] text-cyan-300 font-mono tracking-normal normal-case font-medium">
+                                    {isSimpleMode ? 'Fees Covered' : 'Gas Sponsored'}
+                                  </span>
                                 )}
                               </button>
                               <button
@@ -649,7 +764,7 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                               className="flex-grow py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5"
                             >
                               <Tag className="w-3.5 h-3.5 text-gray-650" />
-                              List
+                              {isSimpleMode ? 'Sell Coffee' : 'List'}
                             </button>
 
                             <button
@@ -660,13 +775,13 @@ export default function OwnershipTransfer({ refreshTrigger }: { refreshTrigger?:
                               className="flex-grow py-2.5 bg-white hover:bg-gray-50 text-cyan-600 border border-cyan-200 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5"
                             >
                               <Layers className="w-3.5 h-3.5" />
-                              Split Batch
+                              {isSimpleMode ? 'Divide Batch' : 'Split Batch'}
                             </button>
                           </div>
                         )
                       ) : (
                         <div className="w-full py-2 bg-gray-50 text-gray-400 border border-gray-100 rounded-xl text-[11px] text-center italic">
-                          Not listed by distributor
+                          {isSimpleMode ? 'Not listed for sale' : 'Not listed by distributor'}
                         </div>
                       )}
                     </div>

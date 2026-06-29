@@ -30,6 +30,8 @@ import {
   ShieldAlert,
   ArrowRight
 } from 'lucide-react';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 interface CropBatch {
   id: number;
@@ -57,6 +59,7 @@ interface ActiveLoan {
 }
 
 export default function LendingPoolConsole() {
+  const { isSimpleMode } = useFriendlyMode();
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -125,85 +128,97 @@ export default function LendingPoolConsole() {
       const nowSeconds = Math.floor(Date.now() / 1000);
 
       for (let i = 1; i <= total; i++) {
-        // Fetch batch details
-        const details: any = await publicClient.readContract({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'cargoBatches',
-          args: [BigInt(i)],
-        });
-
-        const currentOwner: any = await publicClient.readContract({
-          address: CARGO_REGISTRY_ADDRESS,
-          abi: CARGO_REGISTRY_ABI,
-          functionName: 'ownerOf',
-          args: [BigInt(i)],
-        });
-
-        const [
-          producer,
-          origin,
-          harvestDate,
-          latLong,
-          ipfsMetadata,
-          priceUsdc,
-          isForSale,
-          status,
-          paymentToken,
-          isEncrypted,
-          encryptedPrice
-        ] = details;
-
-        let parsedDesc = 'Certified Crop Twin';
-        if (ipfsMetadata.includes('?desc=')) {
-          parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
-        }
-
-        cropsList.push({
-          id: i,
-          producer,
-          origin,
-          harvestDate: Number(harvestDate.toString()) * 1000,
-          latLong,
-          description: parsedDesc,
-          priceUsdc: BigInt(priceUsdc.toString()),
-          isForSale: !!isForSale,
-          status,
-          owner: currentOwner,
-        });
-
-        // Query loan state in CropLendingPool
-        const loan: any = await publicClient.readContract({
-          address: CROP_LENDING_POOL_ADDRESS,
-          abi: CROP_LENDING_POOL_ABI,
-          functionName: 'loans',
-          args: [BigInt(i)],
-        });
-
-        const [borrower, principal, startTime, active] = loan;
-
-        if (active) {
-          const repaymentAmt: any = await publicClient.readContract({
-            address: CROP_LENDING_POOL_ADDRESS,
-            abi: CROP_LENDING_POOL_ABI,
-            functionName: 'getRepaymentAmount',
+        try {
+          const currentOwner: any = await publicClient.readContract({
+            address: CARGO_REGISTRY_ADDRESS,
+            abi: CARGO_REGISTRY_ABI,
+            functionName: 'ownerOf',
             args: [BigInt(i)],
           });
 
-          const isOverdue = nowSeconds > (Number(startTime.toString()) + 30 * 24 * 60 * 60);
-          const isSpoiled = status === 'Spoiled';
+          if (!currentOwner || currentOwner === '0x0000000000000000000000000000000000000000') {
+            continue;
+          }
 
-          loansList.push({
-            tokenId: i,
-            borrower,
-            principal: BigInt(principal.toString()),
-            startTime: Number(startTime.toString()),
-            active: !!active,
-            repaymentAmount: BigInt(repaymentAmt.toString()),
-            cropStatus: status,
-            isOverdue,
-            isSpoiled,
+          // Fetch batch details
+          const details: any = await publicClient.readContract({
+            address: CARGO_REGISTRY_ADDRESS,
+            abi: CARGO_REGISTRY_ABI,
+            functionName: 'cargoBatches',
+            args: [BigInt(i)],
           });
+
+          const [
+            producer,
+            origin,
+            harvestDate,
+            latLong,
+            ipfsMetadata,
+            priceUsdc,
+            isForSale,
+            status,
+            paymentToken,
+            isEncrypted,
+            encryptedPrice
+          ] = details;
+
+          if (producer === '0x0000000000000000000000000000000000000000') {
+            continue;
+          }
+
+          let parsedDesc = 'Certified Crop Twin';
+          if (ipfsMetadata.includes('?desc=')) {
+            parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
+          }
+
+          cropsList.push({
+            id: i,
+            producer,
+            origin,
+            harvestDate: Number(harvestDate.toString()) * 1000,
+            latLong,
+            description: parsedDesc,
+            priceUsdc: BigInt(priceUsdc.toString()),
+            isForSale: !!isForSale,
+            status,
+            owner: currentOwner,
+          });
+
+          // Query loan state in CropLendingPool
+          const loan: any = await publicClient.readContract({
+            address: CROP_LENDING_POOL_ADDRESS,
+            abi: CROP_LENDING_POOL_ABI,
+            functionName: 'loans',
+            args: [BigInt(i)],
+          });
+
+          const [borrower, principal, startTime, active] = loan;
+
+          if (active) {
+            const repaymentAmt: any = await publicClient.readContract({
+              address: CROP_LENDING_POOL_ADDRESS,
+              abi: CROP_LENDING_POOL_ABI,
+              functionName: 'getRepaymentAmount',
+              args: [BigInt(i)],
+            });
+
+            const isOverdue = nowSeconds > (Number(startTime.toString()) + 30 * 24 * 60 * 60);
+            const isSpoiled = status === 'Spoiled';
+
+            loansList.push({
+              tokenId: i,
+              borrower,
+              principal: BigInt(principal.toString()),
+              startTime: Number(startTime.toString()),
+              active: !!active,
+              repaymentAmount: BigInt(repaymentAmt.toString()),
+              cropStatus: status,
+              isOverdue,
+              isSpoiled,
+            });
+          }
+        } catch (tokenErr) {
+          console.log(`Skipped token #${i} in lending console (likely burned or split):`, tokenErr);
         }
       }
 
@@ -272,8 +287,8 @@ export default function LendingPoolConsole() {
   // ─── Actions ───
 
   // 1. Farmer Borrow Action
-  const handleBorrow = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBorrow = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address) {
       setErrorMsg('Please connect your wallet.');
       return;
@@ -389,7 +404,9 @@ export default function LendingPoolConsole() {
         await publicClient.waitForTransactionReceipt({ hash: repayTx });
       }
 
-      setSuccessMsg(`Successfully repaid loan for Crop Twin #${tokenId}! Collateral returned.`);
+      setSuccessMsg(isSimpleMode 
+        ? `Successfully repaid cash advance for Batch #${tokenId}! Your receipt has been unlocked.`
+        : `Successfully repaid loan for Crop Twin #${tokenId}! Collateral returned.`);
       setLoadingStep('idle');
       await refreshBalances();
       await loadCropsAndLoans();
@@ -439,7 +456,9 @@ export default function LendingPoolConsole() {
         await publicClient.waitForTransactionReceipt({ hash: liqTx });
       }
 
-      setSuccessMsg(`Successfully liquidated Loan #${tokenId}! You now own the Crop Twin NFT.`);
+      setSuccessMsg(isSimpleMode 
+        ? `Successfully settled advance #${tokenId}! You now own the coffee batch receipt.`
+        : `Successfully liquidated Loan #${tokenId}! You now own the Crop Twin NFT.`);
       setLoadingStep('idle');
       await refreshBalances();
       await loadCropsAndLoans();
@@ -464,7 +483,7 @@ export default function LendingPoolConsole() {
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-900'
             }`}
           >
-            🌾 Farmer Financing
+            {isSimpleMode ? '🌾 Request Payout Advance' : '🌾 Farmer Financing'}
           </button>
           <button
             onClick={() => setActiveTab('liquidator')}
@@ -474,7 +493,7 @@ export default function LendingPoolConsole() {
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-900'
             }`}
           >
-            ⚖️ Liquidator Arbitrage
+            {isSimpleMode ? '⚖️ Help Center for Expired Crops' : '⚖️ Liquidator Arbitrage'}
           </button>
         </div>
 
@@ -487,10 +506,10 @@ export default function LendingPoolConsole() {
 
       {/* ─── Alerts & Status Panels ─── */}
       {errorMsg && (
-        <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-bounce">
-          <ShieldAlert className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
+        <ErrorCard
+          error={errorMsg}
+          onRetry={selectedBorrowTokenId ? () => handleBorrow() : undefined}
+        />
       )}
 
       {successMsg && (
@@ -527,12 +546,18 @@ export default function LendingPoolConsole() {
                     <ArrowDownCircle className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">Borrow USDC</h3>
-                    <p className="text-[10px] text-gray-400">Lock your crop NFTs to receive instant working capital (50% LTV)</p>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      {isSimpleMode ? 'Request Advance (USDC)' : 'Borrow USDC'}
+                    </h3>
+                    <p className="text-[10px] text-gray-400">
+                      {isSimpleMode 
+                        ? 'Get cash advances by locking your crop receipt. You can get up to 50% of the crops value.'
+                        : 'Lock your crop NFTs to receive instant working capital (50% LTV)'}
+                    </p>
                   </div>
                 </div>
                 <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-150 rounded text-[9px] font-bold text-gray-500 uppercase font-mono">
-                  10.0% APR
+                  {isSimpleMode ? '10.0% Fee Rate' : '10.0% APR'}
                 </span>
               </div>
 
@@ -543,7 +568,9 @@ export default function LendingPoolConsole() {
                 </div>
               ) : myCrops.length === 0 ? (
                 <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400 font-mono">
-                  No eligible crop twins available. Mint and list a cargo twin first to qualify for B2B financing.
+                  {isSimpleMode 
+                    ? 'No digital crop receipts available. Record and list a new crop batch first to qualify for a payout advance.'
+                    : 'No eligible crop twins available. Mint and list a cargo twin first to qualify for B2B financing.'}
                 </div>
               ) : (
                 <form onSubmit={handleBorrow} className="space-y-4">
@@ -551,11 +578,15 @@ export default function LendingPoolConsole() {
                   {/* Select crop twin */}
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <label className="text-[9px] text-gray-400 font-bold uppercase block">Select Collateral NFT</label>
+                      <label className="text-[9px] text-gray-400 font-bold uppercase block">
+                        {isSimpleMode ? 'Select Crop Batch Receipt' : 'Select Collateral NFT'}
+                      </label>
                       <div className="group relative inline-block">
                         <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                         <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                          Choose the active Crop Twin NFT to stake as collateral for financing.
+                          {isSimpleMode 
+                            ? 'Select the digital crop receipt to hold during the advance period.'
+                            : 'Choose the active Crop Twin NFT to stake as collateral for financing.'}
                         </div>
                       </div>
                     </div>
@@ -575,10 +606,12 @@ export default function LendingPoolConsole() {
                       }}
                       className="w-full p-3 bg-gray-50 border border-gray-150 focus:border-gray-300 rounded-2xl text-xs font-mono font-bold text-gray-900 outline-none cursor-pointer"
                     >
-                      <option value="">-- Choose Cargo Twin --</option>
+                      <option value="">{isSimpleMode ? '-- Choose Crop Batch --' : '-- Choose Cargo Twin --'}</option>
                       {myCrops.map((c) => (
                         <option key={c.id} value={c.id}>
-                          Token #{c.id} - {c.description} ({Number(formatUnits(c.priceUsdc, 6)).toFixed(2)} USDC List Price)
+                          {isSimpleMode 
+                            ? `Receipt #${c.id} - ${c.description} (${Number(formatUnits(c.priceUsdc, 6)).toFixed(2)} USDC Estimated Value)`
+                            : `Token #${c.id} - ${c.description} (${Number(formatUnits(c.priceUsdc, 6)).toFixed(2)} USDC List Price)`}
                         </option>
                       ))}
                     </select>
@@ -590,11 +623,15 @@ export default function LendingPoolConsole() {
                       <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
                         <div className="space-y-1 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Borrow Amount</label>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">
+                              {isSimpleMode ? 'Advance Amount' : 'Borrow Amount'}
+                            </label>
                             <div className="group relative inline-block">
                               <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                               <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                                Specify the USDC borrow amount. Subject to a maximum of 50% LTV of listed crop twin value.
+                                {isSimpleMode 
+                                  ? 'Enter how much cash you want to advance (up to 50% of your crops value).'
+                                  : 'Specify the USDC borrow amount. Subject to a maximum of 50% LTV of listed crop twin value.'}
                               </div>
                             </div>
                           </div>
@@ -618,11 +655,10 @@ export default function LendingPoolConsole() {
                         const maxVal = Number(formatUnits(crop.priceUsdc, 6)) / 2;
                         const currentVal = Number(borrowAmount || 0);
                         const isOver = currentVal > maxVal;
-
                         return (
                           <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl text-[11px] font-mono space-y-1.5">
                             <div className="flex justify-between text-gray-400">
-                              <span>Max Loan limit (50% LTV):</span>
+                              <span>{isSimpleMode ? 'Maximum Payout Advance (50%):' : 'Max Loan limit (50% LTV):'}</span>
                               <span className="font-bold text-gray-900">{maxVal.toFixed(2)} USDC</span>
                             </div>
                             <div className="w-full bg-gray-250 h-1 rounded-full overflow-hidden">
@@ -633,7 +669,9 @@ export default function LendingPoolConsole() {
                             </div>
                             {isOver && (
                               <span className="text-red-500 text-[10px] font-bold block">
-                                ⚠️ Borrow amount exceeds the allowed LTV limit.
+                                {isSimpleMode 
+                                  ? '⚠️ Requested advance exceeds the maximum crop value limit.' 
+                                  : '⚠️ Borrow amount exceeds the allowed LTV limit.'}
                               </span>
                             )}
                           </div>
@@ -648,19 +686,19 @@ export default function LendingPoolConsole() {
                         {loadingStep === 'approving' && (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Approving NFT Transfer...</span>
+                            <span>{isSimpleMode ? 'Approving Receipt Lock...' : 'Approving NFT Transfer...'}</span>
                           </>
                         )}
                         {loadingStep === 'borrowing' && (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Routing Loan Funds...</span>
+                            <span>{isSimpleMode ? 'Sending Advance Payout...' : 'Routing Loan Funds...'}</span>
                           </>
                         )}
                         {loadingStep === 'idle' && (
                           <>
                             <Zap className="w-4 h-4" />
-                            <span>Execute Instant Loan</span>
+                            <span>{isSimpleMode ? 'Confirm & Get Advance Payout' : 'Execute Instant Loan'}</span>
                           </>
                         )}
                       </button>
@@ -679,18 +717,22 @@ export default function LendingPoolConsole() {
                     <Clock className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">Your Active Financing</h3>
-                    <p className="text-[10px] text-gray-400">View and repay your active USDC loans</p>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      {isSimpleMode ? 'Your Payout Advances' : 'Your Active Financing'}
+                    </h3>
+                    <p className="text-[10px] text-gray-400">
+                      {isSimpleMode ? 'Check and return active payout advances' : 'View and repay your active USDC loans'}
+                    </p>
                   </div>
                 </div>
                 <span className="px-2 py-0.5 bg-cyan-50 border border-cyan-100 rounded text-[9px] font-bold text-cyan-600">
-                  {myLoans.length} Loans
+                  {myLoans.length} {isSimpleMode ? 'Advances' : 'Loans'}
                 </span>
               </div>
 
               {myLoans.length === 0 ? (
                 <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400 font-mono">
-                  You have no active loans in this pool.
+                  {isSimpleMode ? 'You have no active advances.' : 'You have no active loans in this pool.'}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -698,7 +740,9 @@ export default function LendingPoolConsole() {
                     <div key={l.tokenId} className="p-4 bg-gray-50 border border-gray-150 rounded-2xl space-y-3 flex flex-col justify-between">
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-mono font-bold text-gray-400">TOKEN #{l.tokenId}</span>
+                          <span className="text-[10px] font-mono font-bold text-gray-400">
+                            {isSimpleMode ? `RECEIPT #${l.tokenId}` : `TOKEN #${l.tokenId}`}
+                          </span>
                           <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
                             l.isSpoiled ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                           }`}>
@@ -707,21 +751,25 @@ export default function LendingPoolConsole() {
                         </div>
 
                         <div className="flex justify-between items-baseline">
-                          <span className="text-xs text-gray-400">Principal:</span>
+                          <span className="text-xs text-gray-400">
+                            {isSimpleMode ? 'Advance Payout:' : 'Principal:'}
+                          </span>
                           <span className="text-sm font-mono font-bold text-gray-900">
                             {Number(formatUnits(l.principal, 6)).toFixed(2)} USDC
                           </span>
                         </div>
 
                         <div className="flex justify-between items-baseline">
-                          <span className="text-xs text-gray-400">Repayment Balance:</span>
+                          <span className="text-xs text-gray-400">
+                            {isSimpleMode ? 'Repay Amount:' : 'Repayment Balance:'}
+                          </span>
                           <span className="text-base font-mono font-bold text-emerald-600">
                             {Number(formatUnits(l.repaymentAmount, 6)).toFixed(2)} USDC
                           </span>
                         </div>
 
                         <div className="flex justify-between items-center text-[10px] text-gray-400 border-t border-gray-200/50 pt-2 font-mono">
-                          <span>Start:</span>
+                          <span>{isSimpleMode ? 'Granted on:' : 'Start:'}</span>
                           <span>{new Date(l.startTime * 1000).toLocaleDateString()}</span>
                         </div>
                       </div>
@@ -736,7 +784,7 @@ export default function LendingPoolConsole() {
                         ) : (
                           <Unlock className="w-3.5 h-3.5" />
                         )}
-                        <span>Repay & Retrieve NFT</span>
+                        <span>{isSimpleMode ? 'Repay & Get Receipt Back' : 'Repay & Retrieve NFT'}</span>
                       </button>
                     </div>
                   ))}
@@ -752,31 +800,37 @@ export default function LendingPoolConsole() {
               <div className="absolute right-0 top-0 opacity-10">
                 <Sparkles className="w-32 h-32 text-white" />
               </div>
-              <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Farmer Trade Credit Info</h3>
+              <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                {isSimpleMode ? 'About Payout Advances' : 'Farmer Trade Credit Info'}
+              </h3>
               <div className="space-y-3 text-[11px] font-mono leading-relaxed">
                 <p>
-                  Trade Credit allows farmers to borrow liquid capital against their physical harvests represented by crop twin NFTs.
+                  {isSimpleMode 
+                    ? 'Payout advances let farmers request cash using their digital crop batch receipts.'
+                    : 'Trade Credit allows farmers to borrow liquid capital against their physical harvests represented by crop twin NFTs.'}
                 </p>
                 <div className="space-y-2 border-t border-white/10 pt-3 text-[10px] text-gray-300">
                   <div className="flex justify-between">
-                    <span>Collateral:</span>
-                    <span className="text-white">Crop Twin NFT</span>
+                    <span>{isSimpleMode ? 'Safety Lock:' : 'Collateral:'}</span>
+                    <span className="text-white">{isSimpleMode ? 'Digital Crop Receipt' : 'Crop Twin NFT'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>LTV limit:</span>
-                    <span className="text-white">50% of List Price</span>
+                    <span>{isSimpleMode ? 'Maximum Advance:' : 'LTV limit:'}</span>
+                    <span className="text-white">{isSimpleMode ? '50% of Crop Value' : '50% of List Price'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Interest:</span>
-                    <span className="text-white">10.0% APR</span>
+                    <span>{isSimpleMode ? 'Fee Rate:' : 'Interest:'}</span>
+                    <span className="text-white">{isSimpleMode ? '10.0% Fee' : '10.0% APR'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Escrow Routing:</span>
-                    <span className="text-white font-semibold">Automatic</span>
+                    <span>{isSimpleMode ? 'Automatic Return:' : 'Escrow Routing:'}</span>
+                    <span className="text-white font-semibold">{isSimpleMode ? 'Yes (Upon Sale)' : 'Automatic'}</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-400 italic">
-                  Note: If a B2B buyer purchases your listed crop, the lending pool automatically settles your outstanding debt from the sale revenue and routes the remaining USDC surplus directly to your wallet!
+                  {isSimpleMode 
+                    ? 'Note: When a buyer purchases your crops, your cash advance is automatically paid off from the sale, and all leftover money is sent straight to you!'
+                    : 'Note: If a B2B buyer purchases your listed crop, the lending pool automatically settles your outstanding debt from the sale revenue and routes the remaining USDC surplus directly to your wallet!'}
                 </p>
               </div>
             </div>
@@ -784,13 +838,26 @@ export default function LendingPoolConsole() {
             <div className="p-5 bg-cyan-50 border border-cyan-150 rounded-3xl space-y-3">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-4.5 h-4.5 text-cyan-700" />
-                <h4 className="text-xs font-bold text-cyan-800 uppercase tracking-wider">How to Borrow?</h4>
+                <h4 className="text-xs font-bold text-cyan-800 uppercase tracking-wider">
+                  {isSimpleMode ? 'How to Request an Advance?' : 'How to Borrow?'}
+                </h4>
               </div>
               <ol className="list-decimal pl-4 space-y-2 text-[10px] text-cyan-900 font-mono">
-                <li>Select an active listed crop twin NFT.</li>
-                <li>Verify your requested borrow amount is under the 50% LTV threshold.</li>
-                <li>Approve NFT transfer to the lending pool.</li>
-                <li>Receive USDC instantly. The NFT remains locked until repayment or B2B purchase.</li>
+                {isSimpleMode ? (
+                  <>
+                    <li>Choose an active digital crop receipt.</li>
+                    <li>Check that your advance is under the 50% limit.</li>
+                    <li>Approve receipt lock.</li>
+                    <li>Get cash instantly. The receipt is locked until repaid or crops are sold.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Select an active listed crop twin NFT.</li>
+                    <li>Verify your requested borrow amount is under the 50% LTV threshold.</li>
+                    <li>Approve NFT transfer to the lending pool.</li>
+                    <li>Receive USDC instantly. The NFT remains locked until repayment or B2B purchase.</li>
+                  </>
+                )}
               </ol>
             </div>
           </div>
@@ -808,36 +875,42 @@ export default function LendingPoolConsole() {
                   <TrendingUp className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">Active Pool Loans & Arbitrage</h3>
-                  <p className="text-[10px] text-gray-400">Identify bad debt or spoiled crops to liquidate and claim collateral</p>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    {isSimpleMode ? 'Expired Advances & Settle Crops' : 'Active Pool Loans & Arbitrage'}
+                  </h3>
+                  <p className="text-[10px] text-gray-400">
+                    {isSimpleMode 
+                      ? 'Check for expired advances or spoiled crops to settle and claim ownership'
+                      : 'Identify bad debt or spoiled crops to liquidate and claim collateral'}
+                  </p>
                 </div>
               </div>
               <span className="px-2 py-0.5 bg-amber-50 border border-amber-100 rounded text-[9px] font-bold text-amber-700">
-                {allLoans.length} Active Loans
+                {allLoans.length} {isSimpleMode ? 'Active Advances' : 'Active Loans'}
               </span>
             </div>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-10 space-y-2">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                <span className="text-xs text-gray-400 font-mono">Loading loans...</span>
+                <span className="text-xs text-gray-400 font-mono">{isSimpleMode ? 'Loading advances...' : 'Loading loans...'}</span>
               </div>
             ) : allLoans.length === 0 ? (
               <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center text-xs text-gray-400 font-mono">
-                There are currently no active loans in the lending pool.
+                {isSimpleMode ? 'There are currently no active advances.' : 'There are currently no active loans in the lending pool.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-400 uppercase font-mono bg-gray-50/50">
-                      <th className="py-3 px-4">Token ID</th>
-                      <th className="py-3 px-4">Borrower</th>
-                      <th className="py-3 px-4">Principal</th>
-                      <th className="py-3 px-4">Total Debt</th>
-                      <th className="py-3 px-4">Crop Status</th>
-                      <th className="py-3 px-4">Age / Term</th>
-                      <th className="py-3 px-4 text-right">Liquidation</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Receipt ID' : 'Token ID'}</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Producer' : 'Borrower'}</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Advance Amount' : 'Principal'}</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Repay Amount' : 'Total Debt'}</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Crop Status' : 'Crop Status'}</th>
+                      <th className="py-3 px-4">{isSimpleMode ? 'Date & Status' : 'Age / Term'}</th>
+                      <th className="py-3 px-4 text-right">{isSimpleMode ? 'Claim Crop' : 'Liquidation'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-xs font-mono">
@@ -859,9 +932,11 @@ export default function LendingPoolConsole() {
                           </td>
                           <td className="py-3 px-4 text-gray-500">
                             <div className="flex flex-col">
-                              <span>Started: {new Date(l.startTime * 1000).toLocaleDateString()}</span>
+                              <span>{isSimpleMode ? 'Granted:' : 'Started:'} {new Date(l.startTime * 1000).toLocaleDateString()}</span>
                               <span className={`text-[9px] font-bold ${l.isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
-                                {l.isOverdue ? '⚠️ Overdue (> 30 days)' : 'Healthy duration'}
+                                {l.isOverdue 
+                                  ? (isSimpleMode ? '⚠️ Late (> 30 days)' : '⚠️ Overdue (> 30 days)') 
+                                  : (isSimpleMode ? 'On Time' : 'Healthy duration')}
                               </span>
                             </div>
                           </td>
@@ -877,11 +952,11 @@ export default function LendingPoolConsole() {
                                 ) : (
                                   <ShieldAlert className="w-3.5 h-3.5" />
                                 )}
-                                <span>Liquidate</span>
+                                <span>{isSimpleMode ? 'Settle & Claim' : 'Liquidate'}</span>
                               </button>
                             ) : (
                               <span className="text-[10px] text-gray-400 font-bold block text-right pr-2">
-                                Healthy
+                                {isSimpleMode ? 'Active' : 'Healthy'}
                               </span>
                             )}
                           </td>
@@ -897,12 +972,22 @@ export default function LendingPoolConsole() {
           {/* Liquidator Help Box */}
           <div className="p-5 bg-amber-50 border border-amber-100 text-amber-900 rounded-3xl space-y-2">
             <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4" /> Liquidator Protocol Specs
+              <AlertTriangle className="w-4 h-4" /> {isSimpleMode ? 'Rules for Expired Crops' : 'Liquidator Protocol Specs'}
             </h4>
             <ul className="list-disc pl-4 space-y-1 text-[11px] font-mono">
-              <li>Anyone can act as a liquidator to pay off outstanding debt.</li>
-              <li>A loan becomes eligible for liquidation if either the crop status is marked as <span className="font-bold text-red-600">"Spoiled"</span> by a certifier, OR the loan duration exceeds the <span className="font-bold text-red-600">30-day grace period</span>.</li>
-              <li>Upon liquidation, the liquidator settles the exact loan debt (principal + interest accrued) and instantly claims ownership of the underlying crop twin NFT from the pool.</li>
+              {isSimpleMode ? (
+                <>
+                  <li>Anyone can pay the overdue advance to claim the crop.</li>
+                  <li>Crops become claimable if they spoil or if the advance is not returned within 30 days.</li>
+                  <li>By paying off the advance, you immediately get full ownership of the digital crop receipt.</li>
+                </>
+              ) : (
+                <>
+                  <li>Anyone can act as a liquidator to pay off outstanding debt.</li>
+                  <li>A loan becomes eligible for liquidation if either the crop status is marked as <span className="font-bold text-red-600">"Spoiled"</span> by a certifier, OR the loan duration exceeds the <span className="font-bold text-red-600">30-day grace period</span>.</li>
+                  <li>Upon liquidation, the liquidator settles the exact loan debt (principal + interest accrued) and instantly claims ownership of the underlying crop twin NFT from the pool.</li>
+                </>
+              )}
             </ul>
           </div>
         </div>

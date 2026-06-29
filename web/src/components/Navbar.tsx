@@ -15,15 +15,18 @@ import {
   ChevronDown, 
   Settings, 
   HelpCircle, 
-  FileText 
+  FileText,
+  Cpu
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useCircleAuth } from './CircleAuth';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Navbar() {
   const pathname = usePathname();
   const { session, logout, setIsAuthOpen, setIsSettingsOpen } = useCircleAuth();
+  const { isSimpleMode, toggleSimpleMode } = useFriendlyMode();
   
   // Responsive menus state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -53,149 +56,116 @@ export default function Navbar() {
   }, []);
 
   const links = [
-    { href: '/', label: 'Operations Desk', icon: Layers },
-    { href: '/verifier', label: 'Verifier Portal', icon: Award },
-    { href: '/verify', label: 'Consumer Verification', icon: ShieldCheck },
+    { href: '/dashboard', label: isSimpleMode ? 'Trade & Provenance Desk' : 'Operations Desk', icon: Layers },
+    { href: '/agent-os', label: isSimpleMode ? 'CargoPilot AI Assistant' : 'CargoPilot OS', icon: Cpu },
+    { href: '/verifier', label: isSimpleMode ? 'Quality Inspection' : 'Verifier Portal', icon: Award },
+    { href: '/verify', label: isSimpleMode ? 'Scan & Trace Cargo' : 'Consumer Verification', icon: ShieldCheck },
   ];
 
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/80 backdrop-blur-md transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 2xl:px-12 h-16 md:h-20 flex items-center justify-between gap-3 md:gap-5 2xl:gap-8">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-8 h-20 flex items-center justify-between gap-4">
           
           {/* Logo Section */}
-          <Link href="/" className="flex items-center gap-2.5 group shrink-0 select-none">
-            <div className="p-2 bg-gray-50 rounded-xl border border-gray-150 group-hover:border-gray-300 group-hover:bg-gray-100/50 transition-all duration-300">
-              <Leaf className="w-5 h-5 md:w-5.5 md:h-5.5 text-gray-900" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base md:text-lg font-extrabold tracking-tight text-gray-900 leading-none">
-                CargoTrust
-              </span>
-              <span className="hidden sm:block text-[8px] font-mono tracking-widest text-gray-400 font-bold uppercase mt-1 leading-none">
-                Decentralized Supply Chain
-              </span>
-            </div>
-          </Link>
-
-          {/* 1. Large Screen Navigation (Laptop/Desktop >= 1280px) */}
-          <nav className="hidden xl:flex items-center gap-6 2xl:gap-8">
-            {links.map((link) => {
-              const Icon = link.icon;
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
-                    isActive
-                      ? 'text-gray-900 bg-gray-100/80 border border-gray-200/50 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50/80 border border-transparent'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* 2. Tablet Screen Navigation (Large Tablet 1024px - 1279px) */}
-          <nav className="hidden lg:flex xl:hidden items-center gap-5">
-            {/* Primary active Link */}
-            <Link
-              href="/"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
-                pathname === '/'
-                  ? 'text-gray-900 bg-gray-100/80 border border-gray-200/50'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              Operations Desk
+          <div className="flex-1 max-w-[280px] flex items-center">
+            <Link href="/" className="flex items-center gap-2.5 group select-none">
+              <div className="p-2 bg-gray-50 rounded-xl border border-gray-150 group-hover:border-gray-300 group-hover:bg-gray-100/50 transition-all duration-300 flex items-center justify-center">
+                <Leaf className="w-5 h-5 text-gray-900" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base md:text-lg font-extrabold tracking-tight text-gray-900 leading-none">
+                  CargoTrust
+                </span>
+                <span className="hidden sm:block text-[8px] font-mono tracking-widest text-gray-400 font-bold uppercase mt-1 leading-none">
+                  Decentralized Supply Chain
+                </span>
+              </div>
             </Link>
+          </div>
 
-            {/* Dropdown for lower-priority links */}
-            <div className="relative" ref={dropdownRef}>
+          {/* Middle Navigation - Centered */}
+          <div className="hidden lg:flex flex-1 justify-center items-center">
+            <nav className="flex items-center gap-1 bg-gray-50/80 border border-gray-150 p-1 rounded-2xl shadow-sm">
+              {links.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap ${
+                      isActive
+                        ? 'text-gray-900 bg-white border border-gray-200/50 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-950 hover:bg-white/40 border border-transparent'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {/* Desktop full text */}
+                    <span className="hidden xl:inline">{link.label}</span>
+                    {/* Tablet abbreviated text */}
+                    <span className="xl:hidden">
+                      {link.label === 'Trade & Provenance Desk' || link.label === 'Operations Desk' ? (isSimpleMode ? 'Desk' : 'Ops') :
+                       link.label === 'CargoPilot AI Assistant' || link.label === 'CargoPilot OS' ? 'CargoPilot' :
+                       link.label === 'Quality Inspection' || link.label === 'Verifier Portal' ? (isSimpleMode ? 'Quality' : 'Verifier') :
+                       (isSimpleMode ? 'Trace' : 'Verify')}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Right Actions Area */}
+          <div className="flex-1 max-w-[480px] flex items-center justify-end gap-3.5">
+            
+            {/* Mode Switcher Pill */}
+            <div className="flex bg-gray-50 border border-gray-150 p-0.5 rounded-xl items-center select-none shrink-0 h-10">
               <button
-                onClick={() => setIsMoreOpen(!isMoreOpen)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 border whitespace-nowrap ${
-                  isMoreOpen || pathname === '/verifier' || pathname === '/verify'
-                    ? 'text-gray-900 bg-gray-50 border-gray-200/70'
-                    : 'text-gray-500 border-transparent hover:text-gray-900 hover:bg-gray-50'
+                onClick={() => { if (!isSimpleMode) toggleSimpleMode(); }}
+                className={`px-3 h-[34px] rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
+                  isSimpleMode
+                    ? 'bg-white text-gray-950 shadow-sm border border-gray-100/50'
+                    : 'text-gray-400 hover:text-gray-700'
                 }`}
               >
-                More
-                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isMoreOpen ? 'rotate-180' : ''}`} />
+                <span>🌱 Everyday</span>
               </button>
-              
-              <AnimatePresence>
-                {isMoreOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className="absolute left-0 mt-2 w-56 rounded-2xl bg-white border border-gray-150 p-2 shadow-xl z-50 flex flex-col gap-1"
-                  >
-                    <Link
-                      href="/verifier"
-                      onClick={() => setIsMoreOpen(false)}
-                      className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                        pathname === '/verifier'
-                          ? 'text-gray-950 bg-gray-50'
-                          : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50/80'
-                      }`}
-                    >
-                      <Award className="w-4 h-4 text-gray-400" />
-                      Verifier Portal
-                    </Link>
-                    <Link
-                      href="/verify"
-                      onClick={() => setIsMoreOpen(false)}
-                      className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                        pathname === '/verify'
-                          ? 'text-gray-950 bg-gray-50'
-                          : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50/80'
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4 text-gray-400" />
-                      Consumer Verification
-                    </Link>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <button
+                onClick={() => { if (isSimpleMode) toggleSimpleMode(); }}
+                className={`px-3 h-[34px] rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
+                  !isSimpleMode
+                    ? 'bg-white text-gray-950 shadow-sm border border-gray-100/50'
+                    : 'text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                <span>💻 Expert</span>
+              </button>
             </div>
-          </nav>
 
-          {/* Right Area: Status Badge + Buttons + Hamburger */}
-          <div className="flex items-center gap-3 md:gap-4 xl:gap-5 ml-auto">
-            
-
-
-            {/* Circle Auth States - (Laptop/Desktop Only) */}
+            {/* Circle Auth States */}
             <div className="hidden lg:flex items-center gap-2.5">
               {session ? (
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsSettingsOpen(true)}
-                    className="flex items-center gap-2 h-11 xl:h-12 px-3.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-100 hover:border-cyan-200 rounded-xl text-xs font-mono font-bold transition-all duration-200 shadow-sm whitespace-nowrap"
+                    className="flex items-center gap-2 h-10 px-3.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-100 hover:border-cyan-200 rounded-xl text-xs font-mono font-bold transition-all duration-200 shadow-sm whitespace-nowrap"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
                     {session.email}
                   </button>
                   <button
                     onClick={logout}
-                    className="flex items-center justify-center w-11 h-11 xl:w-12 xl:h-12 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-rose-600 border border-gray-150 hover:border-rose-200 rounded-xl transition-all duration-200 shadow-sm"
+                    className="flex items-center justify-center w-10 h-10 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-rose-600 border border-gray-150 hover:border-rose-200 rounded-xl transition-all duration-200 shadow-sm"
                     title="Sign Out"
                   >
-                    <LogOut className="w-4.5 h-4.5" />
+                    <LogOut className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setIsAuthOpen(true)}
-                  className="h-11 xl:h-12 px-4 xl:px-5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs xl:text-sm font-bold tracking-wide transition-all duration-200 shadow-md shadow-gray-900/5 flex items-center gap-1.5 whitespace-nowrap"
+                  className="h-10 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-200 shadow-md shadow-gray-900/5 flex items-center gap-1.5 whitespace-nowrap active:scale-95"
                 >
                   <User className="w-4 h-4" />
                   Sign In
@@ -203,7 +173,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Connect Wallet Button (Custom RainbowKit for Dynamic Responsive Heights) */}
+            {/* Connect Wallet Button */}
             <ConnectButton.Custom>
               {({
                 account,
@@ -240,7 +210,7 @@ export default function Navbar() {
                           <button
                             onClick={openConnectModal}
                             type="button"
-                            className="h-10 md:h-11 xl:h-12 px-3.5 md:px-4 xl:px-5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs md:text-sm font-extrabold tracking-wide transition-all duration-200 shadow-md shadow-cyan-600/10 flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                            className="h-10 px-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-extrabold tracking-wide transition-all duration-200 shadow-md shadow-cyan-600/10 flex items-center gap-1.5 whitespace-nowrap active:scale-95"
                           >
                             Connect Wallet
                           </button>
@@ -252,7 +222,7 @@ export default function Navbar() {
                           <button
                             onClick={openChainModal}
                             type="button"
-                            className="h-10 md:h-11 xl:h-12 px-3.5 md:px-4 xl:px-5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs md:text-sm font-bold tracking-wide transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap active:scale-95 animate-pulse"
+                            className="h-10 px-4 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold tracking-wide transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap active:scale-95 animate-pulse"
                           >
                             Wrong Network
                           </button>
@@ -264,7 +234,7 @@ export default function Navbar() {
                           <button
                             onClick={openChainModal}
                             type="button"
-                            className="hidden md:flex h-11 xl:h-12 px-3 xl:px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-150 rounded-xl text-xs font-mono font-bold transition-all duration-200 items-center gap-1.5"
+                            className="hidden md:flex h-10 px-3 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-150 rounded-xl text-xs font-mono font-bold transition-all duration-200 items-center gap-1.5"
                           >
                             {chain.hasIcon && chain.iconUrl && (
                               <img
@@ -279,7 +249,7 @@ export default function Navbar() {
                           <button
                             onClick={openAccountModal}
                             type="button"
-                            className="h-10 md:h-11 xl:h-12 px-3.5 md:px-4 xl:px-5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs md:text-sm font-mono font-bold tracking-wide transition-all duration-200 shadow-sm flex items-center gap-1.5 active:scale-95"
+                            className="h-10 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-mono font-bold tracking-wide transition-all duration-200 shadow-sm flex items-center gap-1.5 active:scale-95"
                           >
                             {account.displayName}
                           </button>
@@ -294,7 +264,7 @@ export default function Navbar() {
             {/* Hamburger Button (Mobile/Tablet < 1024px) */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="flex lg:hidden items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-gray-50 hover:bg-gray-100 border border-gray-150 rounded-xl text-gray-900 transition-all duration-200 active:scale-95"
+              className="flex lg:hidden items-center justify-center w-10 h-10 bg-gray-50 hover:bg-gray-100 border border-gray-150 rounded-xl text-gray-900 transition-all duration-200 active:scale-95"
               aria-label="Open Navigation Menu"
             >
               <Menu className="w-5 h-5" />
@@ -338,6 +308,35 @@ export default function Navbar() {
                   >
                     <X className="w-5 h-5 text-gray-500" />
                   </button>
+                </div>
+
+                {/* Mobile Mode Switcher */}
+                <div className="py-4 border-b border-gray-100 flex flex-col gap-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 font-mono">
+                    Experience Mode
+                  </span>
+                  <div className="flex bg-gray-50 border border-gray-150 p-1 rounded-xl items-center select-none w-full">
+                    <button
+                      onClick={() => { if (!isSimpleMode) toggleSimpleMode(); }}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        isSimpleMode
+                          ? 'bg-white text-gray-950 shadow-sm border border-gray-200/50'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <span>🌱 Everyday</span>
+                    </button>
+                    <button
+                      onClick={() => { if (isSimpleMode) toggleSimpleMode(); }}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        !isSimpleMode
+                          ? 'bg-white text-gray-950 shadow-sm border border-gray-200/50'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <span>💻 Expert</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Section 1: Navigation List */}
@@ -417,22 +416,22 @@ export default function Navbar() {
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1 font-mono">
                     Platform Resources
                   </span>
-                  <a
-                    href="#"
+                  <Link
+                    href="/docs"
                     onClick={() => setIsDrawerOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
                   >
                     <FileText className="w-4.5 h-4.5" />
                     Documentation
-                  </a>
-                  <a
-                    href="#"
+                  </Link>
+                  <Link
+                    href="/faq"
                     onClick={() => setIsDrawerOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
                   >
                     <HelpCircle className="w-4.5 h-4.5" />
                     Help & FAQ
-                  </a>
+                  </Link>
                 </div>
               </div>
 

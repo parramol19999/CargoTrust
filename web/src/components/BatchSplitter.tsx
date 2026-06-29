@@ -6,6 +6,8 @@ import { USDC_ADDRESS, USDC_ABI, CARGO_REGISTRY_ADDRESS, truncateAddress } from 
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
 import { formatUnits, parseUnits } from 'viem';
 import { X, Layers, Plus, Trash2, ShieldAlert, Loader2, CheckCircle2, AlertCircle, Info, HelpCircle } from 'lucide-react';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 interface BatchSplitterProps {
   batch: any;
@@ -14,6 +16,7 @@ interface BatchSplitterProps {
 }
 
 export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitterProps) {
+  const { isSimpleMode } = useFriendlyMode();
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -85,8 +88,8 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
   };
 
   // Perform split execution
-  const executeSplit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeSplit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address) {
       setErrorMsg('Wallet not connected.');
       return;
@@ -131,7 +134,11 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
         await publicClient.waitForTransactionReceipt({ hash: splitTx });
       }
 
-      setSuccessMsg(`Batch split completed successfully! ${splits.length} child crop tokens minted.`);
+      setSuccessMsg(
+        isSimpleMode
+          ? `Batch divided successfully! ${splits.length} new sub-batches created.`
+          : `Batch split completed successfully! ${splits.length} child crop tokens minted.`
+      );
       setLoadingStep('success');
       
       await refetchBalance();
@@ -145,7 +152,7 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
 
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Split transaction failed.');
+      setErrorMsg(err.message || (isSimpleMode ? 'Failed to divide batch.' : 'Split transaction failed.'));
       setLoadingStep('idle');
     }
   };
@@ -158,11 +165,13 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-cyan-600" />
-            <h3 className="text-lg font-bold text-gray-900">Split Crop Batch Twin</h3>
+            <h3 className="text-lg font-bold text-gray-900">
+              {isSimpleMode ? 'Divide Coffee Batch' : 'Split Crop Batch Twin'}
+            </h3>
           </div>
           <button 
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-650 rounded-lg hover:bg-gray-50 transition-all"
+            className="p-1 text-gray-400 hover:text-gray-655 rounded-lg hover:bg-gray-50 transition-all"
           >
             <X className="w-5 h-5" />
           </button>
@@ -173,14 +182,16 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
           
           {/* Parent Summary Box */}
           <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2 text-xs">
-            <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-wider">Parent Token Info</span>
+            <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-wider">
+              {isSimpleMode ? 'Original Batch Info' : 'Parent Token Info'}
+            </span>
             <div className="flex justify-between font-mono">
-              <span className="text-gray-500">Token ID:</span>
+              <span className="text-gray-500">{isSimpleMode ? 'Batch ID:' : 'Token ID:'}</span>
               <span className="text-gray-900 font-bold">#{batch.id}</span>
             </div>
             <div className="flex justify-between font-mono">
-              <span className="text-gray-500">Total Batch Weight:</span>
-              <span className="text-gray-900 font-bold">{parentWeight} units</span>
+              <span className="text-gray-500">{isSimpleMode ? 'Total Weight:' : 'Total Batch Weight:'}</span>
+              <span className="text-gray-900 font-bold">{parentWeight} {isSimpleMode ? 'lbs' : 'units'}</span>
             </div>
             <div className="flex justify-between font-mono">
               <span className="text-gray-500">Origin Sourcing:</span>
@@ -192,11 +203,15 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
           <div className="space-y-3">
             <div className="flex justify-between items-center px-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Child Splits Setup</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                  {isSimpleMode ? 'New Sub-Batches Setup' : 'Child Splits Setup'}
+                </span>
                 <div className="group relative inline-block">
                   <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-650 transition-colors" />
                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal font-sans text-center">
-                    Enter the desired weight for each sub-batch child token. The total must sum to the parent weight.
+                    {isSimpleMode 
+                      ? 'Enter the desired weight for each sub-batch. The total must equal the original batch weight.' 
+                      : 'Enter the desired weight for each sub-batch child token. The total must sum to the parent weight.'}
                   </div>
                 </div>
               </div>
@@ -207,7 +222,7 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
                 className="text-[10px] text-cyan-600 hover:text-cyan-700 font-bold flex items-center gap-0.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add Split Token
+                {isSimpleMode ? 'Add Sub-Batch' : 'Add Split Token'}
               </button>
             </div>
 
@@ -225,7 +240,7 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
                       onChange={(e) => handleSplitValueChange(idx, e.target.value)}
                       className="w-full bg-transparent text-sm font-mono font-bold text-gray-900 focus:outline-none"
                     />
-                    <span className="text-xs text-gray-400 ml-1">units</span>
+                    <span className="text-xs text-gray-400 ml-1">{isSimpleMode ? 'lbs' : 'units'}</span>
                   </div>
                   <button
                     type="button"
@@ -243,9 +258,11 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
           {/* Validations & Proportions */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs px-1">
-              <span className="text-gray-500 font-medium">Split Proportions Sum:</span>
+              <span className="text-gray-500 font-medium">
+                {isSimpleMode ? 'Sub-Batches Sum:' : 'Split Proportions Sum:'}
+              </span>
               <span className={`font-mono font-bold ${isSumValid ? 'text-emerald-600' : 'text-red-500'}`}>
-                {sumOfSplits} / {parentWeight} units
+                {sumOfSplits} / {parentWeight} {isSimpleMode ? 'lbs' : 'units'}
               </span>
             </div>
 
@@ -253,12 +270,18 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
             {isSumValid ? (
               <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-2 text-[11px] text-emerald-800 font-medium">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                <span>Split proportions match exactly! Batch splitting is fully aligned.</span>
+                <span>
+                  {isSimpleMode ? 'Sub-batch weights match exactly!' : 'Split proportions match exactly! Batch splitting is fully aligned.'}
+                </span>
               </div>
             ) : (
               <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-2 text-[11px] text-amber-800 font-medium animate-pulse">
                 <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                <span>Sum of split values must equal the parent's weight ({parentWeight} units).</span>
+                <span>
+                  {isSimpleMode 
+                    ? `Sum of sub-batches must equal the original weight (${parentWeight} lbs).` 
+                    : `Sum of split values must equal the parent's weight (${parentWeight} units).`}
+                </span>
               </div>
             )}
           </div>
@@ -267,27 +290,30 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
           <div className="p-4 bg-cyan-50/50 border border-cyan-100/30 rounded-2xl space-y-3">
             <div className="flex items-center gap-1.5 text-cyan-800">
               <Info className="w-4 h-4 text-cyan-600" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Circle stablecoin fees</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                {isSimpleMode ? 'System Fees' : 'Circle stablecoin fees'}
+              </span>
             </div>
             
             <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-cyan-900/80">
-              <div>USDC Fee per child:</div>
+              <div>{isSimpleMode ? 'Fee per sub-batch:' : 'USDC Fee per child:'}</div>
               <div className="text-right font-bold">0.10 USDC</div>
               <div>Estimated Total Fee:</div>
               <div className="text-right font-bold text-gray-900">{totalMintFeeFormatted} USDC</div>
             </div>
 
             <div className="border-t border-cyan-100/60 pt-2 flex justify-between text-[10px] font-mono text-cyan-800/80">
-              <span>Your USDC Balance:</span>
+              <span>{isSimpleMode ? 'Your Dollar Balance:' : 'Your USDC Balance:'}</span>
               <span className="font-bold">{userUsdcBalanceFormatted} USDC</span>
             </div>
           </div>
 
           {/* Transaction error displays */}
           {errorMsg && (
-            <div className="p-3.5 bg-red-50 border border-red-105 rounded-xl text-xs font-semibold text-red-700">
-              ⚠️ {errorMsg}
-            </div>
+            <ErrorCard
+              error={errorMsg}
+              onRetry={executeSplit}
+            />
           )}
 
           {successMsg && (
@@ -298,7 +324,7 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
 
           {txHash && (
             <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 px-1">
-              <span>Transaction hash:</span>
+              <span>{isSimpleMode ? 'Transaction ID:' : 'Transaction hash:'}</span>
               <span className="font-bold text-gray-900 select-all">{truncateAddress(txHash, 8)}</span>
             </div>
           )}
@@ -312,25 +338,25 @@ export default function BatchSplitter({ batch, onClose, onSuccess }: BatchSplitt
             {loadingStep === 'approving' && (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Approving USDC...</span>
+                <span>{isSimpleMode ? 'Approving Fee...' : 'Approving USDC...'}</span>
               </>
             )}
             {loadingStep === 'splitting' && (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Executing Batch Split...</span>
+                <span>{isSimpleMode ? 'Dividing Batch...' : 'Executing Batch Split...'}</span>
               </>
             )}
             {loadingStep === 'idle' && (
               <>
                 <Layers className="w-4 h-4" />
-                <span>{isAllowanceSufficient ? 'Approve & Split Batch' : 'Approve & Split Batch'}</span>
+                <span>{isSimpleMode ? 'Confirm & Divide Batch' : 'Approve & Split Batch'}</span>
               </>
             )}
             {loadingStep === 'success' && (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Splitting Success!</span>
+                <span>{isSimpleMode ? 'Successfully Divided!' : 'Splitting Success!'}</span>
               </>
             )}
           </button>

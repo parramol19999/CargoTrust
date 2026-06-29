@@ -2,14 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
-import { CARGO_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
+import { CARGO_REGISTRY_ADDRESS, VERIFIER_REGISTRY_ADDRESS, truncateAddress } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
+import VERIFIER_REGISTRY_ABI from '@/components/VerifierRegistryABI.json';
 import { Award, BadgeCheck, FileText, CheckSquare, Loader2, RefreshCw, PenTool, HelpCircle } from 'lucide-react';
 import { useWalletClient } from 'wagmi';
 
 import { useGasSponsorship } from '@/lib/gasSponsor';
+import { useFriendlyMode } from '@/lib/useFriendlyMode';
+import ErrorCard from '@/components/ErrorCard';
 
 export default function VerifierDashboard() {
+  const { isSimpleMode } = useFriendlyMode();
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
@@ -45,14 +49,25 @@ export default function VerifierDashboard() {
     functionName: 'nextTokenId',
   });
 
-  // 2. Fetch is msg.sender authorized
-  const { data: isVerifier } = useReadContract({
+  // 2. Fetch is msg.sender authorized directly on CargoRegistry
+  const { data: isRegistryVerifier } = useReadContract({
     address: CARGO_REGISTRY_ADDRESS,
     abi: CARGO_REGISTRY_ABI,
     functionName: 'authorizedVerifiers',
     args: address ? [address] : undefined,
     query: { enabled: !!address }
   });
+
+  // 3. Fetch is msg.sender active on VerifierRegistry (staked verifier)
+  const { data: isActiveVerifier } = useReadContract({
+    address: VERIFIER_REGISTRY_ADDRESS,
+    abi: VERIFIER_REGISTRY_ABI,
+    functionName: 'isActiveVerifier',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address }
+  });
+
+  const isVerifier = !!isRegistryVerifier || !!isActiveVerifier;
 
   const { data: verifierName } = useReadContract({
     address: CARGO_REGISTRY_ADDRESS,
@@ -73,60 +88,72 @@ export default function VerifierDashboard() {
         const loadedBatches = [];
 
         for (let i = 1; i <= total; i++) {
-          const details: any = await publicClient.readContract({
-            address: CARGO_REGISTRY_ADDRESS,
-            abi: CARGO_REGISTRY_ABI,
-            functionName: 'cargoBatches',
-            args: [BigInt(i)],
-          });
+          try {
+            const currentOwner: any = await publicClient.readContract({
+              address: CARGO_REGISTRY_ADDRESS,
+              abi: CARGO_REGISTRY_ABI,
+              functionName: 'ownerOf',
+              args: [BigInt(i)],
+            });
 
-          const currentOwner: any = await publicClient.readContract({
-            address: CARGO_REGISTRY_ADDRESS,
-            abi: CARGO_REGISTRY_ABI,
-            functionName: 'ownerOf',
-            args: [BigInt(i)],
-          });
+            if (!currentOwner || currentOwner === '0x0000000000000000000000000000000000000000') {
+              continue;
+            }
 
-          const verifications: any = await publicClient.readContract({
-            address: CARGO_REGISTRY_ADDRESS,
-            abi: CARGO_REGISTRY_ABI,
-            functionName: 'getVerifications',
-            args: [BigInt(i)],
-          });
+            const details: any = await publicClient.readContract({
+              address: CARGO_REGISTRY_ADDRESS,
+              abi: CARGO_REGISTRY_ABI,
+              functionName: 'cargoBatches',
+              args: [BigInt(i)],
+            });
 
-          const [
-            producer,
-            origin,
-            harvestDate,
-            latLong,
-            ipfsMetadata,
-            priceUsdc,
-            isForSale,
-            status,
-            paymentToken,
-            isEncrypted,
-            encryptedPrice
-          ] = details;
+            const verifications: any = await publicClient.readContract({
+              address: CARGO_REGISTRY_ADDRESS,
+              abi: CARGO_REGISTRY_ABI,
+              functionName: 'getVerifications',
+              args: [BigInt(i)],
+            });
 
-          let parsedDesc = 'Batch details on-chain';
-          if (ipfsMetadata.includes('?desc=')) {
-            parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
+            const [
+              producer,
+              origin,
+              harvestDate,
+              latLong,
+              ipfsMetadata,
+              priceUsdc,
+              isForSale,
+              status,
+              paymentToken,
+              isEncrypted,
+              encryptedPrice
+            ] = details;
+
+            if (producer === '0x0000000000000000000000000000000000000000') {
+              continue;
+            }
+
+            let parsedDesc = 'Batch details on-chain';
+            if (ipfsMetadata.includes('?desc=')) {
+              parsedDesc = decodeURIComponent(ipfsMetadata.split('?desc=')[1]);
+            }
+
+            loadedBatches.push({
+              id: i,
+              producer,
+              origin,
+              harvestDate: Number(harvestDate.toString()) * 1000,
+              latLong,
+              description: parsedDesc,
+              status,
+              owner: currentOwner,
+              verificationsCount: verifications.length,
+              verificationsList: verifications,
+              isEncrypted: !!isEncrypted,
+              encryptedPrice: encryptedPrice || '',
+            });
+          } catch (tokenErr) {
+            console.log(`Skipped token #${i} in verifier dashboard (likely burned or split):`, tokenErr);
           }
-
-          loadedBatches.push({
-            id: i,
-            producer,
-            origin,
-            harvestDate: Number(harvestDate.toString()) * 1000,
-            latLong,
-            description: parsedDesc,
-            status,
-            owner: currentOwner,
-            verificationsCount: verifications.length,
-            verificationsList: verifications,
-            isEncrypted: !!isEncrypted,
-            encryptedPrice: encryptedPrice || '',
-          });
         }
 
         setBatches(loadedBatches.reverse());
@@ -141,8 +168,8 @@ export default function VerifierDashboard() {
     loadAllBatches();
   }, [publicClient, nextTokenId, refreshKey]);
 
-  const handleCertify = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCertify = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!isConnected || !address || !walletClient || !selectedTokenId) {
       setErrorMsg('Web3 wallet context or selected batch is missing.');
       return;
@@ -230,8 +257,12 @@ export default function VerifierDashboard() {
             <Award className="w-5 h-5 text-gray-900" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-gray-900">Authorized Verifier Credentials Dashboard</h3>
-            <p className="text-xs text-gray-400">Independent Quality Testing & Cryptographic Verification Hub</p>
+            <h3 className="text-base font-bold text-gray-900">
+              {isSimpleMode ? 'Quality Inspection Dashboard' : 'Authorized Verifier Credentials Dashboard'}
+            </h3>
+            <p className="text-xs text-gray-400">
+              {isSimpleMode ? 'Independent Coffee Quality Testing & Certification' : 'Independent Quality Testing & Cryptographic Verification Hub'}
+            </p>
           </div>
         </div>
 
@@ -249,11 +280,13 @@ export default function VerifierDashboard() {
           <div className="flex items-center gap-3">
             <BadgeCheck className="w-8 h-8 text-gray-900" />
             <div>
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Verifier Accreditation</span>
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                {isSimpleMode ? 'Inspector Status' : 'Verifier Accreditation'}
+              </span>
               <div className="text-sm font-bold text-gray-900">
                 {isVerifier
-                  ? `${(verifierName as string) || 'Registered Laboratory Expert'}`
-                  : 'Pending Accreditation / General User'}
+                  ? `${(verifierName as string) || (isSimpleMode ? 'Accredited Coffee Laboratory' : 'Registered Laboratory Expert')}`
+                  : (isSimpleMode ? 'Pending Certification / Unaccredited Account' : 'Pending Accreditation / General User')}
               </div>
             </div>
           </div>
@@ -264,8 +297,11 @@ export default function VerifierDashboard() {
       )}
 
       {errorMsg && (
-        <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold mb-4">
-          ⚠️ {errorMsg}
+        <div className="mb-4">
+          <ErrorCard
+            error={errorMsg}
+            onRetry={selectedTokenId ? () => handleCertify() : undefined}
+          />
         </div>
       )}
 
@@ -273,7 +309,7 @@ export default function VerifierDashboard() {
         <div className="bg-gray-50 border border-gray-150 rounded-2xl p-5 mb-6">
           <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
             <h4 className="text-sm font-bold text-gray-900">
-              Certifying Crop Batch: Token ID #{selectedTokenId}
+              {isSimpleMode ? `Certifying Coffee Batch: Batch ID #${selectedTokenId}` : `Certifying Crop Batch: Token ID #${selectedTokenId}`}
             </h4>
             <button
               onClick={() => {
@@ -282,7 +318,7 @@ export default function VerifierDashboard() {
               }}
               className="text-xs text-gray-500 hover:text-gray-900 font-bold"
             >
-              Back to batches
+              {isSimpleMode ? 'Back to coffee list' : 'Back to batches'}
             </button>
           </div>
 
@@ -291,28 +327,42 @@ export default function VerifierDashboard() {
               <div className="w-12 h-12 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                 <CheckSquare className="w-6 h-6" />
               </div>
-              <h5 className="text-sm font-bold text-emerald-700">Verifiable Credential Registered!</h5>
+              <h5 className="text-sm font-bold text-emerald-700">
+                {isSimpleMode ? 'Quality Certificate Registered!' : 'Verifiable Credential Registered!'}
+              </h5>
               <p className="text-xs text-gray-500 max-w-sm mx-auto mt-1">
-                The attestation was successfully signed with your private keys and registered permanently on-chain.
+                {isSimpleMode 
+                  ? 'The quality certificate has been digitally signed and permanently registered.'
+                  : 'The attestation was successfully signed with your private keys and registered permanently on-chain.'}
               </p>
 
               <div className="bg-white border border-gray-100 rounded-2xl p-4 text-left font-mono text-[10px] text-gray-600 max-w-lg mx-auto mt-4 space-y-2">
                 <div>
-                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">W3C Credential Type:</span>
+                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">
+                    {isSimpleMode ? 'Certificate Standard:' : 'W3C Credential Type:'}
+                  </span>
                   <span className="text-gray-900 font-bold">{credType}</span>
                 </div>
                 {isSponsored && (
                   <div>
-                    <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Gas Status:</span>
-                    <span className="text-cyan-600 font-bold">Gas Sponsored ✓</span>
+                    <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">
+                      {isSimpleMode ? 'Network Fees:' : 'Gas Status:'}
+                    </span>
+                    <span className="text-cyan-600 font-bold">
+                      {isSimpleMode ? 'Covered by Platform' : 'Gas Sponsored ✓'}
+                    </span>
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">IPFS Document URI:</span>
+                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">
+                    {isSimpleMode ? 'Secure Record Link:' : 'IPFS Document URI:'}
+                  </span>
                   <span className="text-gray-900 select-all font-bold">{vcIpfsHash}</span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">Signature Proof:</span>
+                  <span className="text-gray-400 block mb-0.5 font-bold uppercase tracking-wider text-[8px]">
+                    {isSimpleMode ? 'Digital Signature:' : 'Signature Proof:'}
+                  </span>
                   <span className="text-emerald-700 select-all overflow-hidden text-ellipsis block max-w-full">
                     {cryptographicSignature}
                   </span>
@@ -326,7 +376,7 @@ export default function VerifierDashboard() {
                 }}
                 className="mt-5 px-5 py-2.5 bg-gray-950 hover:bg-gray-900 text-white rounded-xl text-xs font-bold"
               >
-                Return to Batches
+                {isSimpleMode ? 'Return to Coffee List' : 'Return to Batches'}
               </button>
             </div>
           ) : (
@@ -334,11 +384,13 @@ export default function VerifierDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Credential Badging</label>
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">
+                      {isSimpleMode ? 'Certificate Standard' : 'Credential Badging'}
+                    </label>
                     <div className="group relative inline-block">
                       <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                        Select the W3C Verifiable Credential standard to certify the crop batch.
+                        {isSimpleMode ? 'Select the quality certification standard to apply to this coffee batch.' : 'Select the W3C Verifiable Credential standard to certify the crop batch.'}
                       </div>
                     </div>
                   </div>
@@ -356,11 +408,13 @@ export default function VerifierDashboard() {
 
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Quality Score / Benchmarks</label>
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">
+                      {isSimpleMode ? 'Quality Score / Grade' : 'Quality Score / Benchmarks'}
+                    </label>
                     <div className="group relative inline-block">
                       <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                        Enter the testing quality score or grade. Example format: 98/100, Grade A, or 8.5 pH.
+                        {isSimpleMode ? 'Enter the testing quality score or grade. Example: 98/100, Grade A, or Specialty 85+.' : 'Enter the testing quality score or grade. Example format: 98/100, Grade A, or 8.5 pH.'}
                       </div>
                     </div>
                   </div>
@@ -378,11 +432,13 @@ export default function VerifierDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-3 bg-white border border-gray-100 rounded-xl">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Verification Expiry Date</label>
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">
+                      {isSimpleMode ? 'Certificate Expiration Date' : 'Verification Expiry Date'}
+                    </label>
                     <div className="group relative inline-block">
                       <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                        Select the expiration date for this quality verification.
+                        {isSimpleMode ? 'Select the date this quality certificate will expire.' : 'Select the expiration date for this quality verification.'}
                       </div>
                     </div>
                   </div>
@@ -397,18 +453,20 @@ export default function VerifierDashboard() {
 
                 <div className="p-3 bg-gray-100 border border-gray-200 rounded-xl">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <label className="block text-[10px] text-gray-400 font-bold uppercase">Accredited Testing Laboratory</label>
+                    <label className="block text-[10px] text-gray-400 font-bold uppercase">
+                      {isSimpleMode ? 'Testing Laboratory' : 'Accredited Testing Laboratory'}
+                    </label>
                     <div className="group relative inline-block">
                       <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                       <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                        On-chain registered laboratory identity executing this digital twin verification.
+                        {isSimpleMode ? 'The registered testing lab signing this certificate.' : 'On-chain registered laboratory identity executing this digital twin verification.'}
                       </div>
                     </div>
                   </div>
                   <input
                     type="text"
                     disabled
-                    value={(verifierName as string) || 'Registered Lab Expert'}
+                    value={(verifierName as string) || (isSimpleMode ? 'Accredited Coffee Laboratory' : 'Registered Lab Expert')}
                     className="w-full bg-transparent text-xs font-bold text-gray-500 focus:outline-none"
                   />
                 </div>
@@ -416,11 +474,13 @@ export default function VerifierDashboard() {
 
               <div className="p-3 bg-white border border-gray-100 rounded-xl">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase">Scientific Analysis Notes</label>
+                  <label className="block text-[10px] text-gray-400 font-bold uppercase">
+                    {isSimpleMode ? 'Inspection & Testing Notes' : 'Scientific Analysis Notes'}
+                  </label>
                   <div className="group relative inline-block">
                     <HelpCircle className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
                     <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal normal-case font-normal">
-                      Provide scientific notes. Specify methodologies (e.g., LC-MS), pesticide trace checks, and moisture readings.
+                      {isSimpleMode ? 'Provide notes regarding flavor profile, moisture readings, defect count, and pesticide check.' : 'Provide scientific notes. Specify methodologies (e.g., LC-MS), pesticide trace checks, and moisture readings.'}
                     </div>
                   </div>
                 </div>
@@ -453,16 +513,20 @@ export default function VerifierDashboard() {
                     {isSubmitting ? (
                       <span className="flex items-center gap-2 font-mono">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        {actionStep === 'signing' ? 'Signing W3C Payload...' : 'Anchoring verification on-chain...'}
+                        {actionStep === 'signing' 
+                          ? (isSimpleMode ? 'Signing Certificate...' : 'Signing W3C Payload...') 
+                          : (isSimpleMode ? 'Registering Certificate...' : 'Anchoring verification on-chain...')}
                       </span>
                     ) : (
                       <>
                         <span className="flex items-center gap-2">
                           <PenTool className="w-4 h-4 text-white" />
-                          Sign & Anchor Quality Credentials
+                          {isSimpleMode ? 'Sign & Register Quality Certificate' : 'Sign & Anchor Quality Credentials'}
                         </span>
                         <span className="text-[9px] text-cyan-300 font-mono tracking-normal normal-case font-medium">
-                          {isSponsored ? 'Gas Fee: $0.00 (Sponsored)' : 'Gas Fee: Paid by User'}
+                          {isSponsored 
+                            ? (isSimpleMode ? 'Network Fees: Covered by platform ($0.00)' : 'Gas Fee: $0.00 (Sponsored)') 
+                            : (isSimpleMode ? 'Network Fees: Paid by user' : 'Gas Fee: Paid by User')}
                         </span>
                       </>
                     )}
@@ -477,24 +541,36 @@ export default function VerifierDashboard() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Loader2 className="w-8 h-8 text-gray-900 animate-spin mb-3" />
-          <p className="text-xs font-mono text-gray-400">Loading trace registry...</p>
+          <p className="text-xs font-mono text-gray-400">
+            {isSimpleMode ? 'Loading coffee batches...' : 'Loading trace registry...'}
+          </p>
         </div>
       ) : batches.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed border-gray-250 rounded-2xl text-gray-400 text-center">
           <Award className="w-12 h-12 text-gray-300 mb-2" />
-          <p className="text-sm font-semibold">No batches to certify.</p>
+          <p className="text-sm font-semibold">
+            {isSimpleMode ? 'No coffee batches to certify.' : 'No batches to certify.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Supply Chain Cargo</h4>
+          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            {isSimpleMode ? 'Active Coffee Shipments' : 'Active Supply Chain Cargo'}
+          </h4>
           <div className="overflow-x-auto border border-gray-100 rounded-2xl bg-white">
             <table className="w-full text-left border-collapse text-xs font-mono">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">ID</th>
+                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">
+                    {isSimpleMode ? 'Batch ID' : 'ID'}
+                  </th>
                   <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">Origin</th>
-                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">Custody</th>
-                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">Certs</th>
+                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">
+                    {isSimpleMode ? 'Current Custody' : 'Custody'}
+                  </th>
+                  <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">
+                    {isSimpleMode ? 'Certificates' : 'Certs'}
+                  </th>
                   <th className="p-3 text-gray-500 font-bold uppercase tracking-wider">Status</th>
                   <th className="p-3 text-right text-gray-500 font-bold uppercase tracking-wider">Action</th>
                 </tr>
@@ -515,7 +591,7 @@ export default function VerifierDashboard() {
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                         batch.verificationsCount > 0 ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' : 'bg-gray-50 text-gray-400'
                       }`}>
-                        {batch.verificationsCount} Certed
+                        {batch.verificationsCount} {isSimpleMode ? 'Certified' : 'Certed'}
                       </span>
                     </td>
                     <td className="p-3 text-gray-600 font-semibold">{batch.status}</td>
@@ -527,7 +603,7 @@ export default function VerifierDashboard() {
                         }}
                         className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-900 border border-gray-250 rounded-xl text-[10px] font-bold"
                       >
-                        Verify Quality
+                        {isSimpleMode ? 'Certify Quality' : 'Verify Quality'}
                       </button>
                     </td>
                   </tr>

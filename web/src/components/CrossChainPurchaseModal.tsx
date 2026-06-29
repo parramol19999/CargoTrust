@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { CARGO_REGISTRY_ADDRESS, USDC_ADDRESS, USDC_ABI } from '@/lib/constants';
 import CARGO_REGISTRY_ABI from '@/components/CargoRegistryABI.json';
+import ErrorCard from '@/components/ErrorCard';
 import { 
   SUPPORTED_SOURCE_CHAINS, 
   TOKEN_MESSENGER_ABI, 
@@ -370,10 +371,10 @@ export default function CrossChainPurchaseModal({
           )}
 
           {errorMsg && (
-            <div className="p-3.5 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-600 font-semibold font-mono flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
+            <ErrorCard
+              error={errorMsg}
+              onRetry={handleCrossChainPurchase}
+            />
           )}
 
         </div>
